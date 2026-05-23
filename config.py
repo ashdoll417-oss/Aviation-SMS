@@ -17,4 +17,12 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # SQLAlchemy engine hardening for serverless/transient DB connectivity (Supabase pooler)
+    # Note: For psycopg2, sslmode is best enforced via the DATABASE_URL/DSN (or handled by the pooler),
+    # not via connect_args, which can break depending on driver expectations.
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+    }
+
     # File upload configuration

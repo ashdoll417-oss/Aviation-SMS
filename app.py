@@ -4,7 +4,9 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import os
+import time
 from sqlalchemy import text, extract
+from sqlalchemy.exc import OperationalError
 from config import Config
 from extensions import db, migrate
 from models import Component, RiskAssessment, SafetyPolicy, SafetyAssurance, SafetyPromotion, EmergencyResponsePlan, HazardReport, OccurrenceReport, SafetyObjective, SafetyDrill, EmergencyDrill as ModelsEmergencyDrill, User, LoginLog
@@ -95,7 +97,23 @@ def create_app(config_class=Config):
         if request.method == 'POST':
             username = request.form['username']
             password = request.form['password']
-            user = User.query.filter_by(username=username).first()
+
+            # Retry only the DB lookup during transient serverless connectivity issues.
+            attempts = 3
+            delays = [0.2, 0.6]  # before retry 1 and retry 2 respectively
+            last_err = None
+
+            for attempt in range(attempts):
+                try:
+                    user = User.query.filter_by(username=username).first()
+                    break
+                except OperationalError as e:
+                    last_err = e
+                    user = None
+                    if attempt < attempts - 1:
+                        time.sleep(delays[attempt])
+                    continue
+
             if user and check_password_hash(user.password_hash, password):
                 session['user_id'] = user.id
                 login_log = LoginLog(username=username, ip_address=request.remote_addr)
@@ -103,7 +121,13 @@ def create_app(config_class=Config):
                 db.session.commit()
                 flash('Login successful!')
                 return redirect(url_for('dashboard'))
-            flash('Invalid username or password.')
+
+            # Do not leak connection/host details to the user.
+            if last_err is not None:
+                flash('Temporary database connectivity issue—please try again.')
+            else:
+                flash('Invalid username or password.')
+
         return render_template('login.html')
 
     @app.route('/logout')
