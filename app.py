@@ -41,13 +41,13 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     
-    # On serverless platforms (Vercel) DB connectivity can be temporarily unavailable on cold start.
-    # Avoid hard-crashing the whole app during import.
-    with app.app_context():
-        try:
-            db.create_all()
-        except Exception as e:
-            print(f"db.create_all() skipped/failed during startup: {e}")
+    # Only run create_all locally; production schema is managed directly on Supabase
+    if os.environ.get("VERCEL") is None:
+        with app.app_context():
+            try:
+                db.create_all()
+            except Exception as e:
+                print(f"db.create_all() skipped/failed during startup: {e}")
 
     with app.app_context():
         try:
