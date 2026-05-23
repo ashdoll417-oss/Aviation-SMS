@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, current_app
+from flask import send_from_directory
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -110,6 +111,14 @@ def create_app(config_class=Config):
         session.pop('user_id', None)
         flash('You have been logged out.')
         return redirect(url_for('login'))
+
+    @app.route('/favicon.ico')
+    def favicon_ico():
+        return send_from_directory('static', 'favicon.ico', mimetype='image/x-icon')
+
+    @app.route('/favicon.png')
+    def favicon_png():
+        return send_from_directory('static', 'favicon.png', mimetype='image/png')
 
     @app.route('/dashboard')
     @login_required
