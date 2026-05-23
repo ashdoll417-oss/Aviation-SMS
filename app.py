@@ -23,7 +23,12 @@ RISK_MATRIX = {
 }
 
 def create_app(config_class=Config):
-    app = Flask(__name__)
+    # Redirect instance path to a writable directory on Vercel (read-only filesystem elsewhere)
+    if os.environ.get("VERCEL"):
+        app = Flask(__name__, instance_path="/tmp")
+    else:
+        app = Flask(__name__)
+
     app.config.from_object(config_class)
 
     # Ensure Flask session cookie works reliably across requests.
