@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Edit Hazard Info - {{ report.report_no }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Edit Hazard Report Info</h2>
+    <p>Report ID: {{ report.id }} | Current No: {{ report.report_no }}</p>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="report_no" class="form-label">Report Number</label>
+            <input type="text" class="form-control" id="report_no" name="report_no" value="{{ report.report_no }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="5" required>{{ report.description }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Report</button>
+        <a href="{{ url_for('risk_assessment') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

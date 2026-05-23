@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Manage Safety Objectives{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">Safety Objectives Management</h2>
+            
+            <!-- Add/Update Form -->
+            <div class="card mb-4 kpi-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">{% if request.form.get('objective_id') %}Update{% else %}Add New{% endif %} Safety Objective</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="objective_form">
+                        <input type="hidden" id="objective_id" name="objective_id" value="">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="erp_customer_no" class="form-label">ERP Customer No</label>
+                                <input type="text" class="form-control" id="erp_customer_no" name="erp_customer_no" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="operator_profile_id" class="form-label">Operator Profile ID</label>
+                                <input type="text" class="form-control" id="operator_profile_id" name="operator_profile_id" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="objective_text" class="form-label">Submit</label>
+                                <button type="submit" class="btn btn-primary w-100">Add Objective</button>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12">
+                                <label for="objective_text" class="form-label">Objective Text</label>
+                                <textarea class="form-control" id="objective_text" name="objective_text" rows="3" required></textarea>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear Form</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Objectives List -->
+            {% if objectives %}
+            <div class="card kpi-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Existing Safety Objectives ({{ objectives|length }})</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" style="table-layout: auto; width: 100%;">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>ERP Customer No</th>
+                                    <th>Operator Profile ID</th>
+                                    <th style="min-width: 400px;">Objective Text</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for obj in objectives %}
+                                <tr>
+                                    <td>{{ obj.id }}</td>
+                                    <td>{{ obj.erp_customer_no }}</td>
+                                    <td>{{ obj.operator_profile_id }}</td>
+                                    <td style="white-space: normal !important; word-break: break-word; min-width: 450px;">
+                                        {{ obj.objective_text }}
+                                    </td>
+                                    <td style="width: 130px; vertical-align: middle;">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editObj('{{obj.id}}', '{{obj.erp_customer_no}}', '{{obj.operator_profile_id}}', '{{obj.objective_text}}')">Edit</button>
+                                        <a href="{{ url_for('delete_objective', id=obj.id) }}" class="btn btn-sm btn-outline-danger">Delete</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                No safety objectives found. Add your first objective above.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function editObj(id, customer, profile, text) {
+    document.getElementById('objective_id').value = id;
+    document.getElementById('erp_customer_no').value = customer;
+    document.getElementById('operator_profile_id').value = profile;
+    document.getElementById('objective_text').value = text;
+    document.querySelector('button[type="submit"]').innerText = 'Update Objective';
+    window.scrollTo(0,0);
+}
+
+function clearForm() {
+    document.getElementById('objective_id').value = '';
+    document.getElementById('objective_form').reset();
+    document.querySelector('button[type="submit"]').innerText = 'Add Objective';
+}
+</script>
+{% endblock %}

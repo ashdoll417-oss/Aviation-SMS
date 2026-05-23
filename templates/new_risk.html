@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}New Risk Assessment{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>New Risk Assessment</h2>
+    <form method="POST" action="{{ url_for('new_risk') }}">
+        <div class="mb-3">
+            <label for="hazard_description" class="form-label">Hazard Description</label>
+            <textarea class="form-control" id="hazard_description" name="hazard_description" rows="4" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="probability" class="form-label">Probability (1-5)</label>
+            <select class="form-select" id="probability" name="probability" required>
+                <option value="">Select...</option>
+                <option value="1">1 - Rare</option>
+                <option value="2">2 - Unlikely</option>
+                <option value="3">3 - Possible</option>
+                <option value="4">4 - Likely</option>
+                <option value="5">5 - Almost Certain</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="severity" class="form-label">Severity (A-E)</label>
+            <select class="form-select" id="severity" name="severity" required>
+                <option value="">Select...</option>
+                <option value="A">A - Catastrophic</option>
+                <option value="B">B - Major</option>
+                <option value="C">C - Moderate</option>
+                <option value="D">D - Minor</option>
+                <option value="E">E - Negligible</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Submit Risk</button>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

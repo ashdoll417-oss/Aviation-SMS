@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Safety Objectives - Aviation SMS ERP{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Safety Objectives (Pillar 1)</h2>
+
+    <form method="POST" action="{{ url_for('manage_objectives') }}" class="mb-4">
+        <div class="row">
+            <div class="col-md-3 mb-2">
+                <input type="text" name="customer_no" class="form-control" placeholder="Customer No" required>
+            </div>
+            <div class="col-md-3 mb-2">
+                <input type="text" name="operator_id" class="form-control" placeholder="Operator ID" required>
+            </div>
+            <div class="col-md-6 mb-2">
+                <input type="text" name="objective_text" class="form-control" placeholder="Safety Objective Description" required>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Add Objective</button>
+    </form>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Customer No</th>
+                <th>Operator ID</th>
+                <th>Objective</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for obj in objectives %}
+            <tr>
+                <td>{{ obj.customer_no }}</td>
+                <td>{{ obj.operator_id }}</td>
+                <td>{{ obj.text }}</td>
+                <td>
+                    <a href="{{ url_for('delete_objective', id=obj.id) }}" class="btn btn-danger btn-sm">Delete</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

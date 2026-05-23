@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Emergency Response Plan - AISL-QD-022{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">Emergency Response Plan - Fire Drill Reporting (AISL-QD-022)</h2>
+
+            <div class="card mb-4 kpi-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Emergency Response - Fire Drill Report</h5>
+                </div>
+
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('list_erp') }}" enctype="multipart/form-data">
+
+                        <!-- Image upload row -->
+                        <div class="row g-3 align-items-end mb-3">
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold mb-1" for="erp_image">Upload ERP Photo</label>
+                                <div class="text-muted" style="font-size: 0.9rem;">
+                                    Optional: attach a photo evidence for this report.
+                                </div>
+                            </div>
+
+                            <div class="col-md-4 d-flex justify-content-md-end">
+                                <label for="erp_image" class="btn btn-outline-primary d-inline-flex align-items-center gap-2" style="cursor: pointer;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-camera" viewBox="0 0 16 16">
+                                        <path d="M15 12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h1.172a3 3 0 0 0 2.12-.879l.83-.828A1 1 0 0 1 6.827 3h2.344a1 1 0 0 1 .707.293l.828.828A3 3 0 0 0 12.828 5H14a1 1 0 0 1 1 1zM2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4z"/>
+                                        <path d="M8 11a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5m0 1a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M3-5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0"/>
+                                    </svg>
+                                    <span>Upload ERP Photo</span>
+                                </label>
+                                <input type="file" id="erp_image" name="erp_image" accept="image/*" class="d-none"
+                                       onchange="document.getElementById('fileNameDisplay').innerText = this.files[0] ? this.files[0].name : 'No photo selected'">
+                                <span id="fileNameDisplay" class="text-muted ms-2" style="font-size: 0.9rem;">No photo selected</span>
+                            </div>
+                        </div>
+
+                        <!-- Input grids -->
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle mb-0">
+                                <tbody>
+                                    <tr>
+                                        <th style="width: 25%;">Report Ref</th>
+                                        <td><input type="text" class="form-control" name="report_ref" required aria-label="Report Ref"></td>
+                                        <th style="width: 25%;">Date</th>
+                                        <td><input type="date" class="form-control" name="date" required aria-label="Date"></td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Component Type</th>
+                                        <td><input type="text" class="form-control" name="component_type" aria-label="Component Type"></td>
+                                        <th>Time Since New</th>
+                                        <td><input type="text" class="form-control" name="time_since_new" aria-label="Time Since New"></td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>A/C Reg. Fitted On</th>
+                                        <td><input type="text" class="form-control" name="ac_reg" aria-label="A/C Reg. Fitted On"></td>
+                                        <th>Time Since O/H</th>
+                                        <td><input type="text" class="form-control" name="time_since_oh" aria-label="Time Since O/H"></td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Part Number</th>
+                                        <td><input type="text" class="form-control" name="part_no" aria-label="Part Number"></td>
+                                        <th>Client Name</th>
+                                        <td><input type="text" class="form-control" name="client_name" aria-label="Client Name"></td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Serial Number</th>
+                                        <td colspan="3"><input type="text" class="form-control" name="serial_no" aria-label="Serial Number"></td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Description</th>
+                                        <td colspan="3">
+                                            <textarea class="form-control" name="description" rows="3" aria-label="Description"></textarea>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Initial Assessment Findings</th>
+                                        <td colspan="3">
+                                            <textarea class="form-control" name="initial_findings" rows="3" aria-label="Initial Assessment Findings"></textarea>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Any Other Information</th>
+                                        <td colspan="3">
+                                            <textarea class="form-control" name="other_info" rows="3" aria-label="Any Other Information"></textarea>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Conclusion</th>
+                                        <td colspan="3">
+                                            <textarea class="form-control" name="conclusion" rows="3" aria-label="Conclusion"></textarea>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="row mt-3">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Reported By</label>
+                                <input type="text" class="form-control" name="reported_by" aria-label="Reported By">
+                            </div>
+                            <div class="col-md-6 mb-3 d-flex align-items-end justify-content-md-end">
+                                <button type="submit" class="btn btn-success btn-lg w-100 w-md-auto">Save Emergency Drill Report</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Historical records list -->
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-dark text-white fw-bold">
+                    Historical Emergency Drill Reports (AISL-QD-022)
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 12%;">Report Ref</th>
+                                <th style="width: 10%;">Date</th>
+                                <th style="width: 14%;">Component Type</th>
+                                <th style="width: 12%;">A/C Reg.</th>
+                                <th style="width: 16%;">Part No.</th>
+                                <th style="width: 12%;">Serial No.</th>
+                                <th>Description</th>
+                                <th style="width: 18%;">Conclusion</th>
+                                <th style="width: 14%;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for drill in drills %}
+                            <tr>
+                                <td>{{ drill.report_ref }}</td>
+                                <td>{{ drill.date }}</td>
+                                <td>{{ drill.component_type }}</td>
+                                <td>{{ drill.ac_reg }}</td>
+                                <td>{{ drill.part_no }}</td>
+                                <td>{{ drill.serial_no }}</td>
+                                <td>
+                                    <div style="max-height: 60px; overflow: auto;">
+                                        {{ drill.description }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style="max-height: 60px; overflow: auto;">
+                                        {{ drill.conclusion }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-2">
+                                        <a href="{{ url_for('edit_erp_entry', id=drill.id) }}" class="btn btn-sm btn-outline-warning" title="Edit report">✏️ Edit</a>
+                                        <a href="{{ url_for('delete_erp_entry', id=drill.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this report?');" title="Delete report">🗑️ Delete</a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if drills|length == 0 %}
+                            <tr>
+                                <td colspan="9" class="text-center text-muted py-4">No emergency drill reports saved yet.</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

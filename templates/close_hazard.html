@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Close Hazard Report {{ report.report_no }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Close Hazard Report: {{ report.report_no }}</h2>
+    <p><strong>Date Reported:</strong> {{ report.date_reported.strftime('%Y-%m-%d %H:%M') }}</p>
+    <p><strong>Description:</strong> {{ report.description }}</p>
+    <p><strong>Location:</strong> {{ report.location }}</p>
+    <p><strong>Inherent Risk Score:</strong> {{ report.risk_score }}</p>
+
+    <form method="POST" class="container mt-4">
+        <div class="card mb-4 border-primary shadow-sm">
+            <div class="card-header bg-primary text-white fw-bold">PART B: ROOT CAUSE & CORRECTIVE ACTION (SD-012)</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Responsible Manager (HOD)</label>
+                    <select name="resp_manager" class="form-select" required>
+                        <option value="">-- Select HOD --</option>
+                        <option value="Maintenance Manager">Maintenance Manager</option>
+                        <option value="Quality Manager">Quality Manager</option>
+                        <option value="Accountable Manager">Accountable Manager</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Root Cause Analysis</label>
+                    <textarea name="root_cause" class="form-control" rows="3" required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Corrective Action Taken</label>
+                    <textarea name="corrective_action" class="form-control" rows="3" required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">System Alteration That Would Prevent Recurrence</label>
+                    <textarea name="system_alteration" class="form-control" rows="3" required></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4 border-success shadow-sm">
+            <div class="card-header bg-success text-white fw-bold">AISL-SD-017: SAFETY REPORT FEEDBACK FORM</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Detailed Summary of Actions (For Reporter)</label>
+                    <textarea name="reporter_feedback" class="form-control border-success" rows="4" required placeholder="Provide feedback to the reporter per SD-017..."></textarea>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Report Status</label>
+                        <select name="status" class="form-select border-success">
+                            <option value="MITIGATED / ACTION COMPLETE">MITIGATED / ACTION COMPLETE</option>
+                            <option value="UNDER INVESTIGATION">UNDER INVESTIGATION</option>
+                            <option value="CLOSED">CLOSED</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg w-100 shadow">SUBMIT FULL CAR & FEEDBACK</button>
+    </form>
+</div>
+{% endblock %}

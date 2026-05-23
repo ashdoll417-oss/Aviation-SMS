@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h3 class="mb-0">Log Safety Drill</h3>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-success">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="plan_name" class="form-label">Drill Type / Plan Name</label>
+                            <select class="form-select" id="plan_name" name="plan_name" required>
+                                <option value="">Select or enter drill type...</option>
+                                <option value="Fire Drill">Fire Drill</option>
+                                <option value="Hangar Evacuation">Hangar Evacuation</option>
+                                <option value="Emergency Response Exercise">Emergency Response Exercise</option>
+                                <option value="Custom Drill">Custom Drill (enter below)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="custom_name" class="form-label">Custom Plan Name (if selected)</label>
+                            <input type="text" class="form-control" id="custom_name" name="plan_name" placeholder="e.g., Medical Emergency Drill">
+                        </div>
+                        <div class="mb-3">
+                            <label for="observations" class="form-label">Drill Observations</label>
+                            <textarea class="form-control" id="observations" name="observations" rows="4" placeholder="e.g., Prompt response within 1 minute (Feb 2026 report ref: 2302/26). Note any findings..."></textarea>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success flex-grow-1">Log Drill Performed</button>
+                            <a href="/pillar1/upload" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

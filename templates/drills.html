@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Fire Drill Report (AISL-QD-022){% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">Fire Drill Report Form (AISL-QD-022)</h2>
+
+            <div class="card mb-4 kpi-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Emergency Response - Fire Drill Reporting</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('manage_drills') }}">
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle mb-0">
+                                <tbody>
+                                    <tr>
+                                        <th style="width: 25%;">Report Ref</th>
+                                        <td><input type="text" class="form-control" name="report_ref" required aria-label="Report Ref"></td>
+                                        <th style="width: 25%;">Date</th>
+                                        <td><input type="date" class="form-control" name="date" required aria-label="Date"></td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Component Type</th>
+                                        <td><input type="text" class="form-control" name="component_type" required aria-label="Component Type"></td>
+                                        <th>Time Since New</th>
+                                        <td><input type="text" class="form-control" name="time_since_new" aria-label="Time Since New"></td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>A/C Reg. Fitted On</th>
+                                        <td><input type="text" class="form-control" name="ac_reg" required aria-label="A/C Reg. Fitted On"></td>
+                                        <th>Time Since O/H</th>
+                                        <td><input type="text" class="form-control" name="time_since_oh" aria-label="Time Since O/H"></td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Part Number</th>
+                                        <td><input type="text" class="form-control" name="part_no" required aria-label="Part Number"></td>
+                                        <th>Client Name</th>
+                                        <td><input type="text" class="form-control" name="client_name" aria-label="Client Name"></td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Serial Number</th>
+                                        <td colspan="3"><input type="text" class="form-control" name="serial_no" required aria-label="Serial Number"></td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Description</th>
+                                        <td colspan="3">
+                                            <textarea class="form-control" name="description" rows="3" aria-label="Description"></textarea>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Initial Assessment Findings</th>
+                                        <td colspan="3">
+                                            <textarea class="form-control" name="initial_findings" rows="3" aria-label="Initial Assessment Findings"></textarea>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Any Other Information</th>
+                                        <td colspan="3">
+                                            <textarea class="form-control" name="other_info" rows="3" aria-label="Any Other Information"></textarea>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Conclusion</th>
+                                        <td colspan="3">
+                                            <textarea class="form-control" name="conclusion" rows="3" aria-label="Conclusion"></textarea>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="row mt-3">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Reported By</label>
+                                <input type="text" class="form-control" name="reported_by" required aria-label="Reported By">
+                            </div>
+                            <div class="col-md-6 mb-3 d-flex align-items-end justify-content-md-end">
+                                <button type="submit" class="btn btn-success btn-lg w-100 w-md-auto">Save Drill Report</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-dark text-white fw-bold">
+                    Saved Fire Drill Reports (AISL-QD-022)
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 12%;">Report Ref</th>
+                                <th style="width: 10%;">Date</th>
+                                <th style="width: 14%;">Component Type</th>
+                                <th style="width: 12%;">A/C Reg.</th>
+                                <th style="width: 16%;">Part No.</th>
+                                <th style="width: 12%;">Serial No.</th>
+                                <th>Conclusion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for drill in drills %}
+                            <tr>
+                                <td>{{ drill.report_ref }}</td>
+                                <td>{{ drill.date }}</td>
+                                <td>{{ drill.component_type }}</td>
+                                <td>{{ drill.ac_reg }}</td>
+                                <td>{{ drill.part_no }}</td>
+                                <td>{{ drill.serial_no }}</td>
+                                <td>{{ drill.conclusion }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% if drills|length == 0 %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">No fire drill reports saved yet.</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

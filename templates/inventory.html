@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Component Inventory - Aviation SMS ERP{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-cpu me-2 text-info"></i>Component Inventory</h1>
+        <div>
+            <button class="btn btn-outline-secondary me-2" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i>Print
+            </button>
+            <a href="{{ url_for('export_excel') }}" class="btn btn-success">
+                <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">All Components ({{ components|length or 0 }})</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Serial Number</th>
+                            <th>Part Number</th>
+                            <th>Install Date</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if components %}
+                            {% for component in components %}
+                            <tr class="{% if component.status == 'overdue' %}table-danger{% elif component.status == 'active' %}table-success{% else %}table-warning{% endif %}">
+                                <td>{{ component.id }}</td>
+                                <td>{{ component.name }}</td>
+                                <td><code>{{ component.serial_number }}</code></td>
+                                <td>{{ component.part_number }}</td>
+                                <td>{{ component.install_date.strftime('%Y-%m-%d') if component.install_date else '' }}</td>
+                                <td>
+                                    {% if component.due_date %}
+                                        <span class="badge {% if component.due_date < now %}bg-danger{% else %}bg-warning{% endif %}">
+                                            {{ component.due_date.strftime('%Y-%m-%d') }}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if component.status == 'active' %}success{% elif component.status == 'overdue' %}danger{% else %}secondary{% endif %}">
+                                        {{ component.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('export_pdf', component_id=component.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-file-earmark-pdf"></i> Certificate
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">No components found. Add your first component!</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .card-header { display: none !important; }
+    .table { font-size: 0.9rem; }
+}
+</style>
+{% endblock %}

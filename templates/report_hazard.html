@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Hazard - Aviation SMS ERP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>Report a Hazard</h2>
+        <p>Use this form to report unsafe events or hazards for investigation.</p>
+        <form method="POST">
+            <div class="mb-3">
+                <label>Operation/System</label>
+                <input type="text" name="operation" class="form-control" placeholder="e.g., Maintenance Practices" required>
+            </div>
+            <div class="mb-3">
+                <label>Unsafe Event (The Hazard)</label>
+                <textarea name="unsafe_event" class="form-control" rows="3" required></textarea>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <label>Probability (1-5)</label>
+                    <select name="prob" class="form-select">
+                        <option>1</option>
+                        <option>2</option>
+                        <option>3</option>
+                        <option>4</option>
+                        <option>5</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <label>Severity (A-E)</label>
+                    <select name="sev" class="form-select">
+                        <option>A</option>
+                        <option>B</option>
+                        <option>C</option>
+                        <option>D</option>
+                        <option>E</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Submit for Investigation</button>
+        </form>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

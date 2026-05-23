@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1>Pillar 1 - Safety Manuals Upload</h1>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-success">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <h3>Safety Manuals Upload</h3>
+    <form method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="file" class="form-label">Select PDF Safety Manual</label>
+            <input type="file" class="form-control" id="file" name="file" accept=".pdf" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Upload</button>
+    </form>
+
+    <hr class="my-5">
+
+    <h3>Emergency Response Plans (ERP) - Drill Status</h3>
+    <a href="{{ url_for('update_erp') }}" class="btn btn-success mb-3">Log New Drill <i class="bi bi-plus-circle"></i></a>
+    
+    {% if overdue_erp > 0 %}
+    <div class="alert alert-danger">
+        <strong>{{ overdue_erp }} Overdue Drill{{ 's' if overdue_erp > 1 else '' }}</strong> - Action required!
+    </div>
+    {% endif %}
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Plan Name</th>
+                    <th>Last Drill</th>
+                    <th>Next Drill</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for drill in erp_drills %}
+                <tr {% if drill.NextDrillDate < now %}class="table-danger"{% endif %}>
+                    <td>{{ drill.PlanName }}</td>
+                    <td>{{ drill.LastDrillDate.strftime('%Y-%m-%d') if drill.LastDrillDate else 'Never' }}</td>
+                    <td>{{ drill.NextDrillDate.strftime('%Y-%m-%d') }}</td>
+                    <td><span class="badge bg-{{ 'success' if drill.Status == 'Active' else 'warning' if drill.Status == 'Under Review' else 'danger' }}">{{ drill.Status }}</span></td>
+                    <td>
+                        <a href="{{ url_for('update_erp') }}" class="btn btn-sm btn-outline-primary">Update</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">No drills logged yet. <a href="{{ url_for('update_erp') }}">Log first drill</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <a href="/dashboard" class="btn btn-secondary mt-3">Back to Dashboard</a>
+</div>
+{% endblock %}

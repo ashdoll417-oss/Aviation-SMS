@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Risk Assessment - Aviation SMS ERP{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h3 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>New Risk Assessment</h3>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('risk_assessment') }}">
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label for="hazard_description" class="form-label fw-bold">Hazard Description</label>
+                                <textarea class="form-control" id="hazard_description" name="hazard_description" rows="4" 
+                                          placeholder="Describe the potential hazard in detail..." required></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="probability" class="form-label fw-bold">Probability</label>
+                                <select class="form-select" id="probability" name="probability" required>
+                                    <option value="">Select Probability</option>
+                                    <option value="Rare">Rare</option>
+                                    <option value="Unlikely">Unlikely</option>
+                                    <option value="Possible">Possible</option>
+                                    <option value="Likely">Likely</option>
+                                    <option value="Almost Certain">Almost Certain</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="severity" class="form-label fw-bold">Severity</label>
+                                <select class="form-select" id="severity" name="severity" required>
+                                    <option value="">Select Severity</option>
+                                    <option value="Negligible">Negligible</option>
+                                    <option value="Minor">Minor</option>
+                                    <option value="Moderate">Moderate</option>
+                                    <option value="Major">Major</option>
+                                    <option value="Catastrophic">Catastrophic</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label for="mitigation_plan" class="form-label fw-bold">Mitigation Plan</label>
+                                <textarea class="form-control" id="mitigation_plan" name="mitigation_plan" rows="4" 
+                                          placeholder="Describe controls and mitigation measures..." required></textarea>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-danger btn-lg w-100">
+                                    <i class="bi bi-check-circle me-2"></i>Submit Risk Assessment
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

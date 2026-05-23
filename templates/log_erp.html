@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log ERP Drill</title>
+    {% if config.BOOTSTRAP_VERSION == 6 %}
+        {{ bootstrap.load_css() }}
+    {% else %}
+        {{ bootstrap.load_css() }}
+    {% endif %}
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>Log ERP Drill</h2>
+        <form method="POST" action="{{ url_for('new_erp') }}" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="drill_date" class="form-label">Date Conducted</label>
+                <input type="date" class="form-control" id="drill_date" name="drill_date" required>
+            </div>
+            <div class="mb-3">
+                <label for="observations" class="form-label">Drill Observations</label>
+                <textarea class="form-control" id="observations" name="observations" rows="3"></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="erp_image" class="btn btn-outline-primary d-inline-flex align-items-center gap-2" style="cursor: pointer;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-camera" viewBox="0 0 16 16">
+                        <path d="M15 12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h1.172a3 3 0 0 0 2.12-.879l.83-.828A1 1 0 0 1 6.827 3h2.344a1 1 0 0 1 .707.293l.828.828A3 3 0 0 0 12.828 5H14a1 1 0 0 1 1 1zM2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4z"/>
+                        <path d="M8 11a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5m0 1a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M3-5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0"/>
+                    </svg>
+                    <span>Upload ERP Photo</span>
+                </label>
+                <input type="file" id="erp_image" name="erp_image" accept="image/*" class="d-none" onchange="document.getElementById('fileNameDisplay').innerText = this.files[0].name">
+                <span id="fileNameDisplay" class="text-muted ms-2" style="font-size: 0.9rem;">No photo selected</span>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+    </div>
+    {% if config.BOOTSTRAP_VERSION == 6 %}
+        {{ bootstrap.load_js() }}
+    {% else %}
+        {{ bootstrap.load_js() }}
+    {% endif %}
+</body>
+</html>

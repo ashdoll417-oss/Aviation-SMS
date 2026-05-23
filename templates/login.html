@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aviation SMS ERP - Secure Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body, html { height: 100%; margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+
+        /* 1. VIBRANT SKY & LIGHTNING */
+        .sky {
+            position: fixed; width: 100%; height: 100%; z-index: -3;
+            background: linear-gradient(to bottom, #003366 0%, #0066cc 100%);
+            animation: lightning 8s infinite;
+        }
+
+        @keyframes lightning {
+            0%, 95%, 100% { background: linear-gradient(to bottom, #003366 0%, #0066cc 100%); }
+            96% { background: #b3daff; }
+            97% { background: #003366; }
+            98% { background: #e6f2ff; }
+        }
+
+        /* 2. PURE CSS CLOUDS */
+        .cloud-layer { position: fixed; width: 100%; height: 100%; z-index: -2; opacity: 0.4; }
+        .cloud {
+            position: absolute; background: #fff; border-radius: 100px;
+            filter: blur(30px); animation: moveCloud 25s infinite linear;
+        }
+        .c1 { width: 400px; height: 120px; top: 15%; left: -400px; }
+        .c2 { width: 300px; height: 100px; top: 60%; left: -300px; animation-duration: 35s; }
+        
+        @keyframes moveCloud {
+            from { transform: translateX(-10vw); }
+            to { transform: translateX(110vw); }
+        }
+
+        /* 3. BIRD FLOCK & AIRCRAFT */
+        .birds {
+            position: absolute; top: 20%; color: rgba(255,255,255,0.5);
+            font-size: 1.5rem; letter-spacing: 15px; font-weight: bold;
+            animation: moveCloud 40s infinite linear; z-index: -1;
+        }
+
+        .aircraft-3d { 
+            position: absolute; font-size: 8rem; color: rgba(255, 255, 255, 0.7); 
+            animation: flyAcross 18s infinite linear; pointer-events: none; z-index: 1;
+            filter: drop-shadow(0 20px 40px rgba(0,0,0,0.5));
+        }
+
+        @keyframes flyAcross { 
+            from { left: -20%; top: 40%; transform: scale(0.5) rotate(5deg); opacity: 0; } 
+            20% { opacity: 0.7; }
+            80% { opacity: 0.7; }
+            to { left: 120%; top: 15%; transform: scale(1.5) rotate(-5deg); opacity: 0; } 
+        }
+
+        /* 4. 3D GLASS LOGIN CARD */
+        .wrapper { height: 100vh; display: flex; align-items: center; justify-content: center; perspective: 1200px; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 30px;
+            padding: 4rem; width: 450px; box-shadow: 0 50px 100px rgba(0,0,0,0.6);
+            text-align: center; color: white; animation: float3d 6s infinite ease-in-out;
+            z-index: 10;
+        }
+
+        @keyframes float3d { 
+            0%, 100% { transform: rotateX(5deg) rotateY(-5deg) translateY(0); } 
+            50% { transform: rotateX(-5deg) rotateY(5deg) translateY(-20px); } 
+        }
+
+        /* UI BUTTONS */
+        .btn-vibrant { 
+            background: linear-gradient(90deg, #0061ff, #60efff); border: none; border-radius: 12px; 
+            height: 55px; font-weight: 800; color: white; width: 100%; transition: 0.4s;
+            box-shadow: 0 15px 30px rgba(0, 97, 255, 0.4);
+        }
+        .btn-vibrant:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0, 97, 255, 0.6); }
+        .form-control { background: rgba(255, 255, 255, 0.95); border: none; border-radius: 12px; height: 50px; }
+        .text-info-vibrant { color: #60efff; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="sky"></div>
+    <div class="cloud-layer">
+        <div class="cloud c1"></div>
+        <div class="cloud c2"></div>
+    </div>
+    <div class="birds">v v v v</div>
+    <div class="aircraft-3d">✈</div>
+    
+    <div class="wrapper">
+        <div class="glass-card">
+            <div style="font-size: 4rem; margin-bottom: 1rem; filter: drop-shadow(0 0 15px #0061ff);">✈</div>
+            <h2 style="font-weight: 900; letter-spacing: 2px;">AVIATION SMS</h2>
+            <p style="opacity: 0.8; margin-bottom: 2.5rem; font-size: 0.85rem; text-transform: uppercase;">Safety Management Enterprise</p>
+            
+            <form method="POST">
+                <div class="mb-3 text-start">
+                    <label class="small text-info-vibrant ms-2 mb-1">USER IDENTIFICATION</label>
+                    <input type="text" name="username" class="form-control px-3" placeholder="Enter ID" required>
+                </div>
+                <div class="mb-4 text-start">
+                    <label class="small text-info-vibrant ms-2 mb-1">SECURITY ACCESS KEY</label>
+                    <input type="password" name="password" class="form-control px-3" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-vibrant shadow-lg">INITIALIZE SECURE LOGIN</button>
+            </form>
+            <p class="mt-4 mb-0" style="opacity: 0.5; font-size: 0.7rem;">SYSTEM V1.2 | GLOBAL HUB ACTIVE</p>
+        </div>
+    </div>
+</body>
+</html>

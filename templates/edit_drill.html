@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}Edit Emergency Drill{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">Edit Emergency Drill Report (AISL-QD-022)</h2>
+
+            <div class="card mb-4 kpi-card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Editing Report Ref: {{ drill.report_ref }}</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('edit_erp_entry', id=drill.id) }}" enctype="multipart/form-data">
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle mb-0">
+                                <tbody>
+                                    <tr>
+                                        <th style="width: 25%;">Report Ref</th>
+                                        <td>
+                                            <input
+                                                type="text"
+                                                class="form-control"
+                                                name="report_ref"
+                                                value="{{ drill.report_ref }}"
+                                                required
+                                                placeholder="Enter report reference"
+                                                title="Report reference"
+                                                aria-label="Report reference"
+                                            >
+                                        </td>
+                                        <th style="width: 25%;">Date</th>
+                                        <td>
+                                            <input
+                                                type="date"
+                                                class="form-control"
+                                                name="date"
+                                                value="{{ drill.date }}"
+                                                title="Date"
+                                                aria-label="Date"
+                                            >
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Component Type</th>
+                                        <td>
+                                            <input
+                                                type="text"
+                                                class="form-control"
+                                                name="component_type"
+                                                value="{{ drill.component_type }}"
+                                                placeholder="Enter component type"
+                                                title="Component type"
+                                                aria-label="Component type"
+                                            >
+                                        </td>
+                                        <th>Time Since New</th>
+                                        <td>
+                                            <input
+                                                type="text"
+                                                class="form-control"
+                                                name="time_since_new"
+                                                value="{{ drill.time_since_new }}"
+                                                placeholder="e.g. 1200 cycles"
+                                                title="Time since new"
+                                                aria-label="Time since new"
+                                            >
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>A/C Reg. Fitted On</th>
+                                        <td>
+                                            <input
+                                                type="text"
+                                                class="form-control"
+                                                name="ac_reg"
+                                                value="{{ drill.ac_reg }}"
+                                                placeholder="Enter aircraft registration"
+                                                title="A/C registration"
+                                                aria-label="Aircraft registration"
+                                            >
+                                        </td>
+                                        <th>Time Since O/H</th>
+                                        <td>
+                                            <input
+                                                type="text"
+                                                class="form-control"
+                                                name="time_since_oh"
+                                                value="{{ drill.time_since_oh }}"
+                                                placeholder="e.g. 500 cycles"
+                                                title="Time since overhaul"
+                                                aria-label="Time since overhaul"
+                                            >
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Part Number</th>
+                                        <td>
+                                            <input
+                                                type="text"
+                                                class="form-control"
+                                                name="part_no"
+                                                value="{{ drill.part_no }}"
+                                                placeholder="Enter part number"
+                                                title="Part number"
+                                                aria-label="Part number"
+                                            >
+                                        </td>
+                                        <th>Client Name</th>
+                                        <td>
+                                            <input
+                                                type="text"
+                                                class="form-control"
+                                                name="client_name"
+                                                value="{{ drill.client_name }}"
+                                                placeholder="Enter client name"
+                                                title="Client name"
+                                                aria-label="Client name"
+                                            >
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Serial Number</th>
+                                        <td colspan="3">
+                                            <input
+                                                type="text"
+                                                class="form-control"
+                                                name="serial_no"
+                                                value="{{ drill.serial_no }}"
+                                                placeholder="Enter serial number"
+                                                title="Serial number"
+                                                aria-label="Serial number"
+                                            >
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Description</th>
+                                        <td colspan="3">
+                                            <textarea
+                                                class="form-control"
+                                                name="description"
+                                                rows="3"
+                                                placeholder="Enter description"
+                                                title="Description"
+                                                aria-label="Description"
+                                            >{{ drill.description }}</textarea>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Initial Assessment Findings</th>
+                                        <td colspan="3">
+                                            <textarea
+                                                class="form-control"
+                                                name="initial_findings"
+                                                rows="3"
+                                                placeholder="Enter initial assessment findings"
+                                                title="Initial assessment findings"
+                                                aria-label="Initial assessment findings"
+                                            >{{ drill.initial_findings }}</textarea>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Any Other Information</th>
+                                        <td colspan="3">
+                                            <textarea
+                                                class="form-control"
+                                                name="other_info"
+                                                rows="3"
+                                                placeholder="Enter any other information"
+                                                title="Other information"
+                                                aria-label="Other information"
+                                            >{{ drill.other_info }}</textarea>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Conclusion</th>
+                                        <td colspan="3">
+                                            <textarea
+                                                class="form-control"
+                                                name="conclusion"
+                                                rows="3"
+                                                placeholder="Enter conclusion"
+                                                title="Conclusion"
+                                                aria-label="Conclusion"
+                                            >{{ drill.conclusion }}</textarea>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="row mt-3">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold" for="reported_by">Reported By</label>
+                                <input
+                                    id="reported_by"
+                                    type="text"
+                                    class="form-control"
+                                    name="reported_by"
+                                    value="{{ drill.reported_by }}"
+                                    placeholder="Enter reporter name/role"
+                                    title="Reported by"
+                                    aria-label="Reported by"
+                                >
+                            </div>
+
+                            <div class="col-md-6 mb-3 d-flex align-items-end justify-content-md-end gap-2">
+                                <a href="{{ url_for('list_erp') }}" class="btn btn-secondary w-100 w-md-auto">Cancel</a>
+                                <button type="submit" class="btn btn-success w-100 w-md-auto">Update Emergency Drill Report</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

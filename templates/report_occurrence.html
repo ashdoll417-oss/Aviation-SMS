@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+{% extends "base.html" %}
+
+{% block title %}AISL-SD-005 Part A - Report Occurrence{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <h1 class="mb-4 text-primary">AISL-SD-005 Part A - Occurrence Report Form</h1>
+            <form method="POST" action="{{ url_for('report_occurrence') }}">
+                <div class="card shadow">
+                    <div class="card-body p-4">
+                        <h5 class="card-title mb-4">Report Details</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="reporter_name" class="form-label">Reporter Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="reporter_name" name="reporter_name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="location" class="form-label">Location <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="location" name="location" required>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="report_date" class="form-label">Report Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="report_date" name="report_date" value="{{ request.args.get('date', '') }}" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="description" class="form-label">What Happened (Description) <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="description" name="description" rows="5" placeholder="Provide detailed description of the occurrence..." required></textarea>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="personnel_injured" class="form-label">Personnel Injured</label>
+                                <input type="text" class="form-control" id="personnel_injured" name="personnel_injured" placeholder="Names/ details if any">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="equipment_damaged" class="form-label">Equipment Damaged</label>
+                                <input type="text" class="form-control" id="equipment_damaged" name="equipment_damaged" placeholder="Details if any">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="immediate_action" class="form-label">Immediate Action Taken <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="immediate_action" name="immediate_action" rows="3" placeholder="Actions taken immediately after occurrence..." required></textarea>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('risk_assessment') }}" class="btn btn-secondary me-md-2">Cancel</a>
+                            <button type="submit" class="btn btn-primary btn-lg">Submit Occurrence Report</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
