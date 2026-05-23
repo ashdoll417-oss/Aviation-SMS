@@ -41,20 +41,28 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     
+    # On serverless platforms (Vercel) DB connectivity can be temporarily unavailable on cold start.
+    # Avoid hard-crashing the whole app during import.
     with app.app_context():
-        db.create_all()
-    
+        try:
+            db.create_all()
+        except Exception as e:
+            print(f"db.create_all() skipped/failed during startup: {e}")
+
     with app.app_context():
-        if User.query.count() == 0:
-            default_user = User(
-                username='Admin',
-                password_hash=generate_password_hash('admin123'),
-                email='admin@aviation-sms.com',
-                role='Safety Manager'
-            )
-            db.session.add(default_user)
-            db.session.commit()
-            print("Default Admin user created")
+        try:
+            if User.query.count() == 0:
+                default_user = User(
+                    username='Admin',
+                    password_hash=generate_password_hash('admin123'),
+                    email='admin@aviation-sms.com',
+                    role='Safety Manager'
+                )
+                db.session.add(default_user)
+                db.session.commit()
+                print("Default Admin user created")
+        except Exception as e:
+            print(f"Default user initialization skipped/failed during startup: {e}")
 
     # --- ERP / Emergency Drill Models (defined/active in app.py) ---
     # Reuse the existing table mapping from models.py to avoid duplicate-table mapping issues.
