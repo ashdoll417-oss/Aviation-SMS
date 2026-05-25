@@ -1,7 +1,14 @@
 import os
 
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev_session_fallback_key")
+    # Fail fast on Vercel if SECRET_KEY is not provided.
+    # Using a dev fallback in production can break session security guarantees.
+    if os.environ.get("VERCEL"):
+        SECRET_KEY = os.environ.get("SECRET_KEY")
+        if not SECRET_KEY:
+            raise RuntimeError("SECRET_KEY is required in production (Vercel) but was not found.")
+    else:
+        SECRET_KEY = os.environ.get("SECRET_KEY", "dev_session_fallback_key")
 
     # Fetch database URL from environment variables
     raw_db_url = os.environ.get("DATABASE_URL")

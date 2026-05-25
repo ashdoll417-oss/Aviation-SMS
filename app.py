@@ -545,4 +545,12 @@ def create_app(config_class=Config):
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(debug=True, port=5000, use_reloader=True)
+
+    # Secure startup: never enable Flask debug/reloader on Vercel by default.
+    debug_env = os.environ.get("DEBUG")
+    debug = (debug_env is not None and debug_env.strip().lower() in ("1", "true", "yes", "y", "on"))
+    if os.environ.get("VERCEL"):
+        debug = False
+
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(debug=debug, port=port, use_reloader=debug)
