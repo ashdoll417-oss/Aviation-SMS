@@ -6,7 +6,7 @@ from functools import wraps
 import os
 import time
 from sqlalchemy import text, extract
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from config import Config
 from extensions import db, migrate
 from models import Component, RiskAssessment, SafetyPolicy, SafetyAssurance, SafetyPromotion, EmergencyResponsePlan, HazardReport, OccurrenceReport, SafetyObjective, SafetyDrill, EmergencyDrill as ModelsEmergencyDrill, User, LoginLog
@@ -44,7 +44,8 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     
-    # Only run create_all locally; production schema is managed directly on Supabase
+    # Only run create_all + default user seeding locally.
+    # On Vercel, do not touch the DB during boot to prevent 500s from transient connectivity/auth issues.
     if os.environ.get("VERCEL") is None:
         with app.app_context():
             try:
@@ -52,20 +53,20 @@ def create_app(config_class=Config):
             except Exception as e:
                 print(f"db.create_all() skipped/failed during startup: {e}")
 
-    with app.app_context():
-        try:
-            if User.query.count() == 0:
-                default_user = User(
-                    username='Admin',
-                    password_hash=generate_password_hash('admin123'),
-                    email='admin@aviation-sms.com',
-                    role='Safety Manager'
-                )
-                db.session.add(default_user)
-                db.session.commit()
-                print("Default Admin user created")
-        except Exception as e:
-            print(f"Default user initialization skipped/failed during startup: {e}")
+        with app.app_context():
+            try:
+                if User.query.count() == 0:
+                    default_user = User(
+                        username='Admin',
+                        password_hash=generate_password_hash('admin123'),
+                        email='admin@aviation-sms.com',
+                        role='Safety Manager'
+                    )
+                    db.session.add(default_user)
+                    db.session.commit()
+                    print("Default Admin user created")
+            except Exception as e:
+                print(f"Default user initialization skipped/failed during startup: {e}")
 
     # --- ERP / Emergency Drill Models (defined/active in app.py) ---
     # Reuse the existing table mapping from models.py to avoid duplicate-table mapping issues.
@@ -107,8 +108,10 @@ def create_app(config_class=Config):
                 try:
                     user = User.query.filter_by(username=username).first()
                     break
-                except OperationalError as e:
+                except SQLAlchemyError as e:
+                    # Prevent session pollution on transient failures.
                     last_err = e
+                    db.session.rollback()
                     user = None
                     if attempt < attempts - 1:
                         time.sleep(delays[attempt])

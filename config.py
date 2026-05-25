@@ -6,6 +6,11 @@ class Config:
     # Fetch database URL from environment variables
     raw_db_url = os.environ.get("DATABASE_URL")
 
+    # On Vercel we must fail fast if DATABASE_URL is missing; falling back to SQLite
+    # can cause confusing production 500/OperationalError failures.
+    if os.environ.get("VERCEL") and not raw_db_url:
+        raise RuntimeError("DATABASE_URL is required in production (Vercel) but was not found.")
+
     if raw_db_url:
         # Repair legacy dialect prefixes if present
         if raw_db_url.startswith("postgres://"):
