@@ -588,10 +588,29 @@ def create_app(config_class=Config):
             flash('Audit Date is required.')
             return redirect(url_for('safety_assurance'))
 
+        def _parse_dt(value: str):
+            """
+            Accepts multiple datetime formats from different browsers/UI widgets.
+            Returns datetime or raises ValueError.
+            """
+            value = (value or "").strip()
+            formats = [
+                '%m/%d/%Y, %I:%M %p',  # e.g. 04/22/2026, 03:00 PM
+                '%Y-%m-%dT%H:%M',      # e.g. 2026-04-22T15:00
+                '%Y-%m-%d %H:%M:%S',
+                '%Y-%m-%d %H:%M'
+            ]
+            for fmt in formats:
+                try:
+                    return datetime.strptime(value, fmt)
+                except ValueError:
+                    continue
+            raise ValueError(f"Unsupported datetime format: {value}")
+
         try:
-            audit_date = datetime.strptime(audit_date_str, '%Y-%m-%dT%H:%M')
+            audit_date = _parse_dt(audit_date_str)
         except ValueError:
-            flash('Invalid Audit Date format.')
+            flash('Invalid Audit Date format. Expected format like "MM/DD/YYYY, 03:00 PM".')
             return redirect(url_for('safety_assurance'))
 
         status = request.form.get('status') or 'Open'
@@ -600,14 +619,15 @@ def create_app(config_class=Config):
 
         audit_scope = request.form.get('audit_scope')
         target_month = request.form.get('target_month')
-        department_notified = request.form.get('department_notified') == 'true'
+        dep_val = (request.form.get('department_notified') or "").strip().lower()
+        department_notified = dep_val in ("true", "1", "on", "yes")
 
         next_audit_date = None
         if next_audit_date_str:
             try:
-                next_audit_date = datetime.strptime(next_audit_date_str, '%Y-%m-%dT%H:%M')
+                next_audit_date = _parse_dt(next_audit_date_str)
             except ValueError:
-                flash('Invalid Next Audit Date format.')
+                flash('Invalid Next Audit Date format. Expected format like "MM/DD/YYYY, 10:00 AM".')
                 return redirect(url_for('safety_assurance'))
 
         # File validation + save
