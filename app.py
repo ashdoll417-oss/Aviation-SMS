@@ -4,6 +4,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import os
+import sys
 import time
 from sqlalchemy import text, extract
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
@@ -70,6 +71,27 @@ def create_app(config_class=Config):
 
     # --- ERP / Emergency Drill Models (defined/active in app.py) ---
     # Reuse the existing table mapping from models.py to avoid duplicate-table mapping issues.
+
+    # Production safety: verify critical tables/columns on Vercel cold starts.
+    # Soft-fail: if sync fails, log the error and allow the server to continue running.
+    if os.environ.get("VERCEL"):
+        @app.before_request
+        def _sync_schema_on_cold_start():
+            if app.config.get("_schema_sync_done"):
+                return
+            app.config["_schema_sync_done"] = True
+
+            try:
+                import subprocess
+                # Call the script as a separate process to avoid import-time side effects.
+                subprocess.run(
+                    [sys.executable, os.path.join(os.path.dirname(__file__), "scripts", "sync_all_tables.py")],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except Exception as e:
+                app.logger.exception("Schema sync failed on cold start (soft-fail). Error: %s", e)
     class EmergencyDrill(db.Model):
         __table__ = ModelsEmergencyDrill.__table__
 
