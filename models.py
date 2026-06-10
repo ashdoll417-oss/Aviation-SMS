@@ -64,9 +64,9 @@ class RiskAssessment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     hazard_description = db.Column(db.Text, nullable=False)
     probability = db.Column(db.Integer, nullable=False)  # 1-5 scale
-    severity = db.Column(db.Enum('A', 'B', 'C', 'D', 'E'), nullable=False)
+    severity = db.Column(db.Enum('A', 'B', 'C', 'D', 'E', name='risk_assessment_severity_enum'), nullable=False)
     risk_score = db.Column(db.Integer)
-    risk_level = db.Column(db.Enum(RiskLevel), nullable=False)
+    risk_level = db.Column(db.Enum(RiskLevel, name='risk_assessment_risk_level_enum'), nullable=False)
     mitigation_plan = db.Column(db.Text, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 

@@ -1,35 +1,26 @@
-# Aviation SMS ERP - Run & Fix Routes (End-to-End)
+# TODO
 
-## Step 1: Initial verification
-- [ ] Run `python app.py` and capture traceback/errors
-- [ ] Fix any startup/import/config issues
+## Login works but dashboard fails (Vercel 500)
+### Root cause
+`GET /dashboard` throws 500 due to missing DB table:
+- `psycopg2.errors.UndefinedTable: relation "risk_assessment" does not exist`
+- Triggered by: `risks = RiskAssessment.query.all()` in `/dashboard`
 
-## Step 2: Model ↔ Route ↔ Template alignment
-- [ ] Align `EmergencyResponsePlan` SQLAlchemy model fields with what routes/templates expect (`plan_name`, `description`, `coordinator`, `phone`, optional `erp_image`)
-- [ ] Verify other model field names used by routes/templates (HazardReport, OccurrenceReport, SafetyObjective, SafetyDrill, EmergencyDrill, RiskAssessment, etc.)
+### Required fix
+1. Ensure migrations have created all required tables in the **same PostgreSQL database** used by Vercel (`DATABASE_URL`).
+2. Apply migrations against that DB so tables like `risk_assessment` exist.
+3. Confirm that the `risk_assessment` table exists.
 
-## Step 3: Database/schema consistency
-- [ ] Ensure tables exist / schema matches models
-- [ ] If needed for dev: delete or recreate `aviation_sms_erp.db` or use migrations
+> Current proof: `/dashboard` crashes with `UndefinedTable: relation "risk_assessment" does not exist` at:
+> `risks = RiskAssessment.query.all()`.
 
-## Step 4: End-to-end route smoke tests
-- [ ] `/login` (GET/POST)
-- [ ] `/dashboard`
-- [ ] `/erp/new` (create)
-- [ ] `/erp/update` (update)
-- [ ] `/erp/list`
-- [ ] `/export/excel`, `/export/pdf`, `/export/erp/pdf`, `/export/risk/excel`
-- [ ] `/risk/new`, `/risk/assessment`, `/risk/assessment/new`
-- [ ] `/hazard/report`, `/hazard/assess/<id>`, `/hazard/close/<id>`, `/hazard/report/list`
-- [ ] `/occurrence/report`, `/occurrence/form`
-- [ ] `/inventory`
-- [ ] `/drills`, `/drills/add`, `/drills/edit/<id>`
-- [ ] `/manage_objectives`, `/delete_objective/<id>`
+### Optional robustness improvement (recommended)
+After DB is fixed, prevent the whole dashboard from crashing if any single table is missing:
+- Wrap `/dashboard` queries in try/except (SQLAlchemyError / ProgrammingError),
+- Default dashboard values (0 / empty lists),
+- Optionally flash/log which table is missing.
 
-## Step 5: Uploads/static paths
-- [ ] Ensure upload directories exist for ERP images and drill photos
-- [ ] Ensure any “static/uploads/...” paths match template usage
-
-## Step 6: Final verification
-- [ ] Re-run `python app.py`
-- [ ] Confirm all smoke tests render without template errors and persist data correctly
+### Diagnostic commands (local)
+- `alembic current`
+- `alembic upgrade head`
+- Verify table existence via psql using `DATABASE_URL`.
