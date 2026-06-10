@@ -79,6 +79,15 @@ class SafetyAssurance(db.Model):
     finding_details = db.Column(db.Text)
     status = db.Column(db.Enum('Open', 'Closed'), default='Open')
     next_audit_date = db.Column(db.DateTime)
+
+    # Audit Plan upload (nullable)
+    audit_plan_filename = db.Column(db.String(255), nullable=True)
+
+    # Additional requested inputs
+    audit_scope = db.Column(db.Text, nullable=True)
+    target_month = db.Column(db.String(50), nullable=True)
+    department_notified = db.Column(db.Boolean, nullable=True, default=False)
+
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     def __repr__(self):

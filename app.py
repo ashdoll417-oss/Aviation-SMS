@@ -563,6 +563,107 @@ def create_app(config_class=Config):
         flash('Objective deleted.')
         return redirect(url_for('manage_objectives'))
 
+    @app.route('/safety/assurance', methods=['GET'])
+    @login_required
+    def safety_assurance():
+        user_id = session.get('user_id')
+        latest = (
+            SafetyAssurance.query
+            .filter_by(user_id=user_id)
+            .order_by(SafetyAssurance.audit_date.desc())
+            .first()
+        )
+        return render_template('safety_assurance.html', latest=latest)
+
+    @app.route('/safety/assurance', methods=['POST'])
+    @login_required
+    def safety_assurance_post():
+        user_id = session.get('user_id')
+        if not user_id:
+            flash('Please log in to access this page.')
+            return redirect(url_for('login'))
+
+        audit_date_str = request.form.get('audit_date')
+        if not audit_date_str:
+            flash('Audit Date is required.')
+            return redirect(url_for('safety_assurance'))
+
+        try:
+            audit_date = datetime.strptime(audit_date_str, '%Y-%m-%dT%H:%M')
+        except ValueError:
+            flash('Invalid Audit Date format.')
+            return redirect(url_for('safety_assurance'))
+
+        status = request.form.get('status') or 'Open'
+        finding_details = request.form.get('finding_details')
+        next_audit_date_str = request.form.get('next_audit_date')
+
+        audit_scope = request.form.get('audit_scope')
+        target_month = request.form.get('target_month')
+        department_notified = request.form.get('department_notified') == 'true'
+
+        next_audit_date = None
+        if next_audit_date_str:
+            try:
+                next_audit_date = datetime.strptime(next_audit_date_str, '%Y-%m-%dT%H:%M')
+            except ValueError:
+                flash('Invalid Next Audit Date format.')
+                return redirect(url_for('safety_assurance'))
+
+        # File validation + save
+        allowed_ext = {'.pdf', '.docx', '.xlsx'}
+        upload = request.files.get('audit_plan')
+        audit_plan_filename = None
+
+        if upload and upload.filename and upload.filename.strip():
+            filename = secure_filename(upload.filename)
+            ext = os.path.splitext(filename)[1].lower()
+            if ext not in allowed_ext:
+                flash('Invalid file type. Allowed: PDF, DOCX, XLSX.')
+                return redirect(url_for('safety_assurance'))
+
+            upload_dir = os.path.join('static', 'uploads', 'safety_assurance')
+            os.makedirs(upload_dir, exist_ok=True)
+
+            name_root, _ = os.path.splitext(filename)
+            unique_suffix = int(datetime.utcnow().timestamp())
+            final_filename = f"{name_root}_{unique_suffix}{ext}"
+
+            save_path = os.path.join(upload_dir, final_filename)
+            upload.save(save_path)
+            audit_plan_filename = final_filename
+
+        # Upsert by (user_id, audit_date)
+        assurance = SafetyAssurance.query.filter_by(user_id=user_id, audit_date=audit_date).first()
+        if assurance is None:
+            assurance = SafetyAssurance(
+                audit_date=audit_date,
+                finding_details=finding_details,
+                status=status,
+                next_audit_date=next_audit_date,
+                audit_scope=audit_scope,
+                target_month=target_month,
+                department_notified=department_notified,
+                user_id=user_id
+            )
+            db.session.add(assurance)
+
+        # Update fields
+        assurance.finding_details = finding_details
+        assurance.status = status
+        assurance.next_audit_date = next_audit_date
+        assurance.audit_scope = audit_scope
+        assurance.target_month = target_month
+        assurance.department_notified = department_notified
+
+        # Only set filename if a new file was uploaded
+        if audit_plan_filename is not None:
+            assurance.audit_plan_filename = audit_plan_filename
+
+        db.session.commit()
+        flash('Safety Assurance record saved successfully.')
+        return redirect(url_for('safety_assurance'))
+
     return app  # This MUST be the last line of the create_app function
 
 if __name__ == "__main__":
