@@ -74,21 +74,22 @@ class RiskAssessment(db.Model):
         return f'<RiskAssessment {self.hazard_description[:50]}...>'
 
 class SafetyAssurance(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    audit_date = db.Column(db.DateTime, nullable=False)
-    finding_details = db.Column(db.Text)
-    status = db.Column(db.Enum('Open', 'Closed'), default='Open')
-    next_audit_date = db.Column(db.DateTime)
+    __tablename__ = 'safety_assurance'
 
-    # Audit Plan upload (nullable)
+    id = db.Column(db.Integer, primary_key=True)
+
+    audit_date = db.Column(db.DateTime, nullable=True)
+    finding_details = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(100), nullable=True)
+    next_audit_date = db.Column(db.DateTime, nullable=True)
+
     audit_plan_filename = db.Column(db.String(255), nullable=True)
 
-    # Additional requested inputs
-    audit_scope = db.Column(db.Text, nullable=True)
+    audit_scope = db.Column(db.String(255), nullable=True)
     target_month = db.Column(db.String(50), nullable=True)
-    department_notified = db.Column(db.Boolean, nullable=True, default=False)
 
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    department_notified = db.Column(db.Boolean, default=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
     def __repr__(self):
         return f'<SafetyAssurance {self.finding_details or "No findings"}>'

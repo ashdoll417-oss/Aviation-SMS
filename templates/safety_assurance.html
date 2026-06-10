@@ -13,11 +13,14 @@
     </div>
 
     <div class="card-body">
-      <form method="POST" enctype="multipart/form-data">
+      <form method="POST" enctype="multipart/form-data" onsubmit="return window.__safetyAssuranceOnSubmit(event)">
+        <input type="hidden" name="audit_date" id="audit_date_hidden" />
+        <input type="hidden" name="next_audit_date" id="next_audit_date_hidden" />
+
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label" for="audit_date">Audit Date <span class="text-danger">*</span></label>
-            <input id="audit_date" type="datetime-local" name="audit_date" class="form-control" required title="Select the audit date/time" />
+            <input id="audit_date" type="datetime-local" name="audit_date_ui" class="form-control" required title="Select the audit date/time" />
           </div>
 
           <div class="col-md-4">
@@ -30,8 +33,57 @@
 
           <div class="col-md-4">
             <label class="form-label" for="next_audit_date">Next Audit Date</label>
-            <input id="next_audit_date" type="datetime-local" name="next_audit_date" class="form-control" title="Select the next audit date/time" />
+            <input id="next_audit_date" type="datetime-local" name="next_audit_date_ui" class="form-control" title="Select the next audit date/time" />
           </div>
+
+          <script>
+            window.__safetyAssuranceOnSubmit = function (event) {
+              try {
+                const auditInput = document.getElementById('audit_date');
+                const nextInput = document.getElementById('next_audit_date');
+
+                function pad2(n) { return String(n).padStart(2, '0'); }
+
+                function toFlatpickrLike(iso) {
+                  // iso expected: "YYYY-MM-DDTHH:MM"
+                  if (!iso) return '';
+                  const dt = new Date(iso);
+                  if (Number.isNaN(dt.getTime())) return '';
+
+                  const mm = pad2(dt.getMonth() + 1);
+                  const dd = pad2(dt.getDate());
+                  const yyyy = dt.getFullYear();
+
+                  let hours = dt.getHours();
+                  const ampm = hours >= 12 ? 'PM' : 'AM';
+                  hours = hours % 12;
+                  if (hours === 0) hours = 12;
+
+                  const minutes = pad2(dt.getMinutes());
+                  return `${mm}/${dd}/${yyyy}, ${pad2(hours)}:${minutes} ${ampm}`.replace(/\/(\d{2}), (\d{2}):/,'/$1, $2:'); 
+                  // Note: the replace above is no-op for typical values; it just avoids accidental formatting issues.
+                }
+
+                const auditVal = auditInput ? auditInput.value : '';
+                if (!auditVal) return true; // required attribute will handle validation
+
+                const flatAudit = toFlatpickrLike(auditVal);
+                if (!flatAudit) return false;
+
+                document.getElementById('audit_date_hidden').value = flatAudit;
+
+                const nextVal = nextInput ? nextInput.value : '';
+                const flatNext = toFlatpickrLike(nextVal);
+                if (flatNext) document.getElementById('next_audit_date_hidden').value = flatNext;
+                else document.getElementById('next_audit_date_hidden').value = '';
+
+                return true;
+              } catch (e) {
+                console.error(e);
+                return true;
+              }
+            };
+          </script>
 
           <div class="col-md-6">
             <label class="form-label" for="audit_scope">Audit Scope</label>

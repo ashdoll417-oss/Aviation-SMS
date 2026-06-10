@@ -583,34 +583,39 @@ def create_app(config_class=Config):
             flash('Please log in to access this page.')
             return redirect(url_for('login'))
 
+        from datetime import datetime
+
+        def parse_date(date_str):
+            if not date_str:
+                return None
+
+            s = str(date_str).strip()
+
+            # Your flatpickr-style strings:
+            # "04/22/2026, 03:00 PM" or "04/20/2027, 10:00 AM"
+            for fmt in ('%m/%d/%Y, %I:%M %p', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
+                try:
+                    return datetime.strptime(s, fmt)
+                except ValueError:
+                    continue
+
+            # Additional safe fallbacks for inputs that may arrive from <input type="datetime-local">
+            for fmt in ('%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S'):
+                try:
+                    return datetime.strptime(s, fmt)
+                except ValueError:
+                    continue
+
+            return None
+
         audit_date_str = request.form.get('audit_date')
         if not audit_date_str:
             flash('Audit Date is required.')
             return redirect(url_for('safety_assurance'))
 
-        def _parse_dt(value: str):
-            """
-            Accepts multiple datetime formats from different browsers/UI widgets.
-            Returns datetime or raises ValueError.
-            """
-            value = (value or "").strip()
-            formats = [
-                '%m/%d/%Y, %I:%M %p',  # e.g. 04/22/2026, 03:00 PM
-                '%Y-%m-%dT%H:%M',      # e.g. 2026-04-22T15:00
-                '%Y-%m-%d %H:%M:%S',
-                '%Y-%m-%d %H:%M'
-            ]
-            for fmt in formats:
-                try:
-                    return datetime.strptime(value, fmt)
-                except ValueError:
-                    continue
-            raise ValueError(f"Unsupported datetime format: {value}")
-
-        try:
-            audit_date = _parse_dt(audit_date_str)
-        except ValueError:
-            flash('Invalid Audit Date format. Expected format like "MM/DD/YYYY, 03:00 PM".')
+        audit_date = parse_date(audit_date_str)
+        if audit_date is None:
+            flash('Invalid Audit Date format.')
             return redirect(url_for('safety_assurance'))
 
         status = request.form.get('status') or 'Open'
@@ -619,25 +624,20 @@ def create_app(config_class=Config):
 
         audit_scope = request.form.get('audit_scope')
         target_month = request.form.get('target_month')
-        dep_val = (request.form.get('department_notified') or "").strip().lower()
-        department_notified = dep_val in ("true", "1", "on", "yes")
 
-        next_audit_date = None
-        if next_audit_date_str:
-            try:
-                next_audit_date = _parse_dt(next_audit_date_str)
-            except ValueError:
-                flash('Invalid Next Audit Date format. Expected format like "MM/DD/YYYY, 10:00 AM".')
-                return redirect(url_for('safety_assurance'))
+        # Explicit checkbox boolean safety
+        dept_notified = True if request.form.get('department_notified') else False
 
-        # File validation + save
-        allowed_ext = {'.pdf', '.docx', '.xlsx'}
-        upload = request.files.get('audit_plan')
+        next_audit_date = parse_date(next_audit_date_str) if next_audit_date_str else None
+
+        # File management & safe save
+        file = request.files.get('audit_plan')
         audit_plan_filename = None
 
-        if upload and upload.filename and upload.filename.strip():
-            filename = secure_filename(upload.filename)
-            ext = os.path.splitext(filename)[1].lower()
+        if file and file.filename and file.filename.strip():
+            allowed_ext = {'.pdf', '.docx', '.xlsx'}
+            safe_name = secure_filename(file.filename)
+            ext = os.path.splitext(safe_name)[1].lower()
             if ext not in allowed_ext:
                 flash('Invalid file type. Allowed: PDF, DOCX, XLSX.')
                 return redirect(url_for('safety_assurance'))
@@ -645,17 +645,18 @@ def create_app(config_class=Config):
             upload_dir = os.path.join('static', 'uploads', 'safety_assurance')
             os.makedirs(upload_dir, exist_ok=True)
 
-            name_root, _ = os.path.splitext(filename)
+            name_root, _ = os.path.splitext(safe_name)
             unique_suffix = int(datetime.utcnow().timestamp())
             final_filename = f"{name_root}_{unique_suffix}{ext}"
 
             save_path = os.path.join(upload_dir, final_filename)
-            upload.save(save_path)
+            file.save(save_path)
             audit_plan_filename = final_filename
 
         # Upsert by (user_id, audit_date)
         assurance = SafetyAssurance.query.filter_by(user_id=user_id, audit_date=audit_date).first()
-        if assurance is None:
+        is_new = assurance is None
+        if is_new:
             assurance = SafetyAssurance(
                 audit_date=audit_date,
                 finding_details=finding_details,
@@ -663,24 +664,32 @@ def create_app(config_class=Config):
                 next_audit_date=next_audit_date,
                 audit_scope=audit_scope,
                 target_month=target_month,
-                department_notified=department_notified,
+                department_notified=dept_notified,
                 user_id=user_id
             )
             db.session.add(assurance)
 
-        # Update fields
+        # Update fields explicitly
         assurance.finding_details = finding_details
         assurance.status = status
         assurance.next_audit_date = next_audit_date
         assurance.audit_scope = audit_scope
         assurance.target_month = target_month
-        assurance.department_notified = department_notified
+        assurance.department_notified = dept_notified
 
         # Only set filename if a new file was uploaded
         if audit_plan_filename is not None:
             assurance.audit_plan_filename = audit_plan_filename
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"DATABASE ERROR: {str(e)}")
+            current_app.logger.error(str(e))
+            flash('Database error while saving Safety Assurance record.')
+            return redirect(url_for('safety_assurance'))
+
         flash('Safety Assurance record saved successfully.')
         return redirect(url_for('safety_assurance'))
 
