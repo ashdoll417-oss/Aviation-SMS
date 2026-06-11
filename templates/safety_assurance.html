@@ -4,21 +4,21 @@
 <div class="container mt-4" style="max-width: 980px;">
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h2 class="mb-0">Safety Assurance</h2>
-    <span class="badge text-bg-primary">Audit Plan Upload</span>
+    <span class="badge text-bg-primary">Audit Framework</span>
   </div>
 
-  <!-- TAB SWITCHER HTML (Place right below the page heading): -->
-  <div class="flex justify-center space-x-4 mb-6">
-    <button id="btn-upload" class="px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 bg-blue-600 text-white shadow" onclick="switchTab('upload')">
+  <div class="text-center mb-4">
+    <div class="btn-group" role="group" aria-label="Section Switcher">
+      <button id="btn-upload" type="button" class="btn btn-primary px-4 py-2" onclick="switchTab('upload')">
         Upload &amp; Schedule Audit
-    </button>
-    <button id="btn-history" class="px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 bg-gray-100 text-gray-600 hover:bg-gray-200" onclick="switchTab('history')">
+      </button>
+      <button id="btn-history" type="button" class="btn btn-outline-primary px-4 py-2" onclick="switchTab('history')">
         View Audit History &amp; Records
-    </button>
+      </button>
+    </div>
   </div>
 
-  <!-- WRAPPER SECTIONS -->
-  <div id="upload-section" class="block">
+  <div id="upload-section" style="display: block;">
     <div class="card shadow-sm">
       <div class="card-header bg-white">
         <strong>Safety Assurance - Audit Plan Upload</strong>
@@ -48,64 +48,162 @@
               <input id="next_audit_date" type="datetime-local" name="next_audit_date_ui" class="form-control" title="Select the next audit date/time" />
             </div>
 
-            <script>
-              window.__safetyAssuranceOnSubmit = function (event) {
-                try {
-                  const auditInput = document.getElementById('audit_date');
-                  const nextInput = document.getElementById('next_audit_date');
-
-                  function pad2(n) { return String(n).padStart(2, '0'); }
-
-                  function toFlatpickrLike(iso) {
-                    // iso expected: "YYYY-MM-DDTHH:MM"
-                    if (!iso) return '';
-                    const dt = new Date(iso);
-                    if (Number.isNaN(dt.getTime())) return '';
-
-                    const mm = pad2(dt.getMonth() + 1);
-                    const dd = pad2(dt.getDate());
-                    const yyyy = dt.getFullYear();
-
-                    let hours = dt.getHours();
-                    const ampm = hours >= 12 ? 'PM' : 'AM';
-                    hours = hours % 12;
-                    if (hours === 0) hours = 12;
-
-                    const minutes = pad2(dt.getMinutes());
-                    return `${mm}/${dd}/${yyyy}, ${pad2(hours)}:${minutes} ${ampm}`.replace(/\/(\d{2}), (\d{2}):/,'/$1, $2:'); 
-                    // Note: the replace above is no-op for typical values; it just avoids accidental formatting issues.
-                  }
-
-                  const auditVal = auditInput ? auditInput.value : '';
-                  if (!auditVal) return true; // required attribute will handle validation
-
-                  const flatAudit = toFlatpickrLike(auditVal);
-                  if (!flatAudit) return false;
-
-                  document.getElementById('audit_date_hidden').value = flatAudit;
-
-                  const nextVal = nextInput ? nextInput.value : '';
-                  const flatNext = toFlatpickrLike(nextVal);
-                  if (flatNext) document.getElementById('next_audit_date_hidden').value = flatNext;
-                  else document.getElementById('next_audit_date_hidden').value = '';
-
-                  return true;
-                } catch (e) {
-                  console.error(e);
-                  return true;
-                }
-              };
-            </script>
-
             <div class="col-md-6">
               <label class="form-label" for="audit_scope">Audit Scope</label>
-              <input id="audit_scope" type="text" name="audit_scope" class="form-control" placeholder="e.g., SMS Processes - 2026" title="Enter audit scope" />
+              <input id="audit_scope" type="text" name="audit_scope" class="form-control" placeholder="e.g., SMS Processes" title="Enter audit scope" />
             </div>
 
             <div class="col-md-6">
               <label class="form-label" for="target_month">Target Month</label>
-              <input id="target_month" type="text" name="target_month" class="form-control" placeholder="e.g., 2026-07 or July 2026" title="Enter target month" />
+              <input id="target_month" type="text" name="target_month" class="form-control" placeholder="e.g., July 2026" title="Enter target month" />
             </div>
 
             <div class="col-md-12">
-              {# Keep the remainder of your existing upload form markup here #}
+              <label class="form-label" for="finding_details">Finding Details</label>
+              <textarea id="finding_details" name="finding_details" class="form-control" rows="3" placeholder="Enter finding details..."></textarea>
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label" for="audit_plan">Upload Audit Plan Document</label>
+              <input id="audit_plan" type="file" name="audit_plan" class="form-control" />
+            </div>
+
+            <div class="col-md-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="department_notified" id="department_notified" value="y">
+                <label class="form-check-label" for="department_notified">
+                  Notify relevant departments immediately via email
+                </label>
+              </div>
+            </div>
+
+            <div class="col-md-12 text-end">
+              <button type="submit" class="btn btn-success px-4">Save Audit Record</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="history-section" style="display: none;">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong class="mb-0">Saved Safety Assurance Records</strong>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Audit Date</th>
+              <th>Audit Scope</th>
+              <th>Target Month</th>
+              <th>Status</th>
+              <th>Next Audit</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if records %}
+              {% for record in records %}
+              <tr>
+                <td>{{ record.audit_date.strftime('%m/%d/%Y') if record.audit_date else 'N/A' }}</td>
+                <td><strong>{{ record.audit_scope or 'N/A' }}</strong></td>
+                <td>{{ record.target_month or 'N/A' }}</td>
+                <td>
+                  <span class="badge {% if record.status == 'Closed' %}text-bg-success{% else %}text-bg-warning{% endif %}">
+                    {{ record.status }}
+                  </span>
+                </td>
+                <td>{{ record.next_audit_date.strftime('%m/%d/%Y') if record.next_audit_date else 'N/A' }}</td>
+                <td class="text-end">
+                  {% if record.audit_plan_data %}
+                    <a href="{{ url_for('download_plan', record_id=record.id) }}" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-download"></i> Download Plan
+                    </a>
+                  {% else %}
+                    <span class="text-muted small">No File</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="6" class="text-center py-4 text-muted">No audit records found.</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  window.__safetyAssuranceOnSubmit = function (event) {
+    try {
+      const auditInput = document.getElementById('audit_date');
+      const nextInput = document.getElementById('next_audit_date');
+
+      function pad2(n) { return String(n).padStart(2, '0'); }
+
+      function toFlatpickrLike(iso) {
+        if (!iso) return '';
+        const dt = new Date(iso);
+        if (Number.isNaN(dt.getTime())) return '';
+
+        const mm = pad2(dt.getMonth() + 1);
+        const dd = pad2(dt.getDate());
+        const yyyy = dt.getFullYear();
+
+        let hours = dt.getHours();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        if (hours === 0) hours = 12;
+
+        const minutes = pad2(dt.getMinutes());
+        return `${mm}/${dd}/${yyyy}, ${pad2(hours)}:${minutes} ${ampm}`;
+      }
+
+      const auditVal = auditInput ? auditInput.value : '';
+      if (!auditVal) return true;
+
+      const flatAudit = toFlatpickrLike(auditVal);
+      if (!flatAudit) return false;
+
+      document.getElementById('audit_date_hidden').value = flatAudit;
+
+      const nextVal = nextInput ? nextInput.value : '';
+      const flatNext = toFlatpickrLike(nextVal);
+      if (flatNext) document.getElementById('next_audit_date_hidden').value = flatNext;
+      else document.getElementById('next_audit_date_hidden').value = '';
+
+      return true;
+    } catch (e) {
+      console.error(e);
+      return true;
+    }
+  };
+
+  // 5. BOOTSTRAP VISIBILITY TOGGLE FUNCTION
+  function switchTab(tab) {
+    const uploadSec = document.getElementById('upload-section');
+    const historySec = document.getElementById('history-section');
+    const btnUpload = document.getElementById('btn-upload');
+    const btnHistory = document.getElementById('btn-history');
+
+    if (tab === 'upload') {
+      uploadSec.style.display = 'block';
+      historySec.style.display = 'none';
+      btnUpload.className = "btn btn-primary px-4 py-2";
+      btnHistory.className = "btn btn-outline-primary px-4 py-2";
+    } else {
+      uploadSec.style.display = 'none';
+      historySec.style.display = 'block';
+      btnUpload.className = "btn btn-outline-primary px-4 py-2";
+      btnHistory.className = "btn btn-primary px-4 py-2";
+    }
+  }
+</script>
+{% endblock %}
