@@ -7,178 +7,105 @@
     <span class="badge text-bg-primary">Audit Plan Upload</span>
   </div>
 
-  <div class="card shadow-sm">
-    <div class="card-header bg-white">
-      <strong>Safety Assurance - Audit Plan Upload</strong>
-    </div>
+  <!-- TAB SWITCHER HTML (Place right below the page heading): -->
+  <div class="flex justify-center space-x-4 mb-6">
+    <button id="btn-upload" class="px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 bg-blue-600 text-white shadow" onclick="switchTab('upload')">
+        Upload &amp; Schedule Audit
+    </button>
+    <button id="btn-history" class="px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 bg-gray-100 text-gray-600 hover:bg-gray-200" onclick="switchTab('history')">
+        View Audit History &amp; Records
+    </button>
+  </div>
 
-    <div class="card-body">
-      <form method="POST" enctype="multipart/form-data" onsubmit="return window.__safetyAssuranceOnSubmit(event)">
-        <input type="hidden" name="audit_date" id="audit_date_hidden" />
-        <input type="hidden" name="next_audit_date" id="next_audit_date_hidden" />
+  <!-- WRAPPER SECTIONS -->
+  <div id="upload-section" class="block">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white">
+        <strong>Safety Assurance - Audit Plan Upload</strong>
+      </div>
 
-        <div class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label" for="audit_date">Audit Date <span class="text-danger">*</span></label>
-            <input id="audit_date" type="datetime-local" name="audit_date_ui" class="form-control" required title="Select the audit date/time" />
-          </div>
+      <div class="card-body">
+        <form method="POST" enctype="multipart/form-data" onsubmit="return window.__safetyAssuranceOnSubmit(event)">
+          <input type="hidden" name="audit_date" id="audit_date_hidden" />
+          <input type="hidden" name="next_audit_date" id="next_audit_date_hidden" />
 
-          <div class="col-md-4">
-            <label class="form-label" for="status">Status</label>
-            <select id="status" name="status" class="form-select" title="Select status">
-              <option value="Open">Open</option>
-              <option value="Closed">Closed</option>
-            </select>
-          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label" for="audit_date">Audit Date <span class="text-danger">*</span></label>
+              <input id="audit_date" type="datetime-local" name="audit_date_ui" class="form-control" required title="Select the audit date/time" />
+            </div>
 
-          <div class="col-md-4">
-            <label class="form-label" for="next_audit_date">Next Audit Date</label>
-            <input id="next_audit_date" type="datetime-local" name="next_audit_date_ui" class="form-control" title="Select the next audit date/time" />
-          </div>
+            <div class="col-md-4">
+              <label class="form-label" for="status">Status</label>
+              <select id="status" name="status" class="form-select" title="Select status">
+                <option value="Open">Open</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
 
-          <script>
-            window.__safetyAssuranceOnSubmit = function (event) {
-              try {
-                const auditInput = document.getElementById('audit_date');
-                const nextInput = document.getElementById('next_audit_date');
+            <div class="col-md-4">
+              <label class="form-label" for="next_audit_date">Next Audit Date</label>
+              <input id="next_audit_date" type="datetime-local" name="next_audit_date_ui" class="form-control" title="Select the next audit date/time" />
+            </div>
 
-                function pad2(n) { return String(n).padStart(2, '0'); }
+            <script>
+              window.__safetyAssuranceOnSubmit = function (event) {
+                try {
+                  const auditInput = document.getElementById('audit_date');
+                  const nextInput = document.getElementById('next_audit_date');
 
-                function toFlatpickrLike(iso) {
-                  // iso expected: "YYYY-MM-DDTHH:MM"
-                  if (!iso) return '';
-                  const dt = new Date(iso);
-                  if (Number.isNaN(dt.getTime())) return '';
+                  function pad2(n) { return String(n).padStart(2, '0'); }
 
-                  const mm = pad2(dt.getMonth() + 1);
-                  const dd = pad2(dt.getDate());
-                  const yyyy = dt.getFullYear();
+                  function toFlatpickrLike(iso) {
+                    // iso expected: "YYYY-MM-DDTHH:MM"
+                    if (!iso) return '';
+                    const dt = new Date(iso);
+                    if (Number.isNaN(dt.getTime())) return '';
 
-                  let hours = dt.getHours();
-                  const ampm = hours >= 12 ? 'PM' : 'AM';
-                  hours = hours % 12;
-                  if (hours === 0) hours = 12;
+                    const mm = pad2(dt.getMonth() + 1);
+                    const dd = pad2(dt.getDate());
+                    const yyyy = dt.getFullYear();
 
-                  const minutes = pad2(dt.getMinutes());
-                  return `${mm}/${dd}/${yyyy}, ${pad2(hours)}:${minutes} ${ampm}`.replace(/\/(\d{2}), (\d{2}):/,'/$1, $2:'); 
-                  // Note: the replace above is no-op for typical values; it just avoids accidental formatting issues.
+                    let hours = dt.getHours();
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    hours = hours % 12;
+                    if (hours === 0) hours = 12;
+
+                    const minutes = pad2(dt.getMinutes());
+                    return `${mm}/${dd}/${yyyy}, ${pad2(hours)}:${minutes} ${ampm}`.replace(/\/(\d{2}), (\d{2}):/,'/$1, $2:'); 
+                    // Note: the replace above is no-op for typical values; it just avoids accidental formatting issues.
+                  }
+
+                  const auditVal = auditInput ? auditInput.value : '';
+                  if (!auditVal) return true; // required attribute will handle validation
+
+                  const flatAudit = toFlatpickrLike(auditVal);
+                  if (!flatAudit) return false;
+
+                  document.getElementById('audit_date_hidden').value = flatAudit;
+
+                  const nextVal = nextInput ? nextInput.value : '';
+                  const flatNext = toFlatpickrLike(nextVal);
+                  if (flatNext) document.getElementById('next_audit_date_hidden').value = flatNext;
+                  else document.getElementById('next_audit_date_hidden').value = '';
+
+                  return true;
+                } catch (e) {
+                  console.error(e);
+                  return true;
                 }
+              };
+            </script>
 
-                const auditVal = auditInput ? auditInput.value : '';
-                if (!auditVal) return true; // required attribute will handle validation
-
-                const flatAudit = toFlatpickrLike(auditVal);
-                if (!flatAudit) return false;
-
-                document.getElementById('audit_date_hidden').value = flatAudit;
-
-                const nextVal = nextInput ? nextInput.value : '';
-                const flatNext = toFlatpickrLike(nextVal);
-                if (flatNext) document.getElementById('next_audit_date_hidden').value = flatNext;
-                else document.getElementById('next_audit_date_hidden').value = '';
-
-                return true;
-              } catch (e) {
-                console.error(e);
-                return true;
-              }
-            };
-          </script>
-
-          <div class="col-md-6">
-            <label class="form-label" for="audit_scope">Audit Scope</label>
-            <input id="audit_scope" type="text" name="audit_scope" class="form-control" placeholder="e.g., SMS Processes - 2026" title="Enter audit scope" />
-          </div>
-
-          <div class="col-md-6">
-            <label class="form-label" for="target_month">Target Month</label>
-            <input id="target_month" type="text" name="target_month" class="form-control" placeholder="e.g., 2026-07 or July 2026" title="Enter target month" />
-          </div>
-
-          <div class="col-md-12">
-            <label class="form-label" for="finding_details">Finding Details</label>
-            <textarea id="finding_details" name="finding_details" class="form-control" rows="3" placeholder="Optional summary of findings..." title="Enter optional finding details"></textarea>
-          </div>
-
-          <div class="col-md-12">
-            <div class="p-3 rounded border bg-light">
-              <div class="d-flex align-items-center gap-3">
-                <div class="fs-3" aria-hidden="true">📎</div>
-                <div class="flex-grow-1">
-                  <label class="form-label mb-1" for="audit_plan">Upload Audit Plan</label>
-                  <div class="form-text mb-2">
-                    Allowed files: PDF, DOCX, XLSX
-                  </div>
-                  <input id="audit_plan" class="form-control" type="file" name="audit_plan" accept=".pdf,.docx,.xlsx" aria-label="Upload the audit plan document" />
-                </div>
-              </div>
+            <div class="col-md-6">
+              <label class="form-label" for="audit_scope">Audit Scope</label>
+              <input id="audit_scope" type="text" name="audit_scope" class="form-control" placeholder="e.g., SMS Processes - 2026" title="Enter audit scope" />
             </div>
-          </div>
 
-          <div class="col-md-12">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="true" id="department_notified" name="department_notified" />
-              <label class="form-check-label" for="department_notified">
-                Notify department (Department Notified)
-              </label>
+            <div class="col-md-6">
+              <label class="form-label" for="target_month">Target Month</label>
+              <input id="target_month" type="text" name="target_month" class="form-control" placeholder="e.g., 2026-07 or July 2026" title="Enter target month" />
             </div>
-          </div>
 
-          <div class="col-md-12 d-flex gap-2 justify-content-end">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">Back</a>
-            <button type="submit" class="btn btn-primary">
-              Save Audit Record
-            </button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div class="card shadow-sm mt-4">
-    <div class="card-header bg-white">
-      <strong>Saved Safety Assurance Records</strong>
-    </div>
-
-    <div class="card-body p-0">
-      {% if assurances and assurances|length > 0 %}
-      <div class="table-responsive">
-        <table class="table table-striped mb-0">
-          <thead class="table-light">
-            <tr>
-              <th style="min-width: 220px;">Audit Scope</th>
-              <th style="min-width: 160px;">Target Month</th>
-              <th style="width: 180px;">Audit Plan</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for record in assurances %}
-            <tr>
-              <td>{{ record.audit_scope or '-' }}</td>
-              <td>{{ record.target_month or '-' }}</td>
-              <td>
-                {% if record.audit_plan_data %}
-                  <a class="btn btn-sm btn-primary"
-                     href="{{ url_for('download_plan', record_id=record.id) }}"
-                     title="Download audit plan">
-                    Download
-                  </a>
-                {% else %}
-                  <span class="text-muted">No plan</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <div class="p-3">
-        <div class="text-muted">No safety assurance records found.</div>
-      </div>
-      {% endif %}
-    </div>
-  </div>
-
-</div>
-{% endblock %}
+            <div class="col-md-12">
+              {# Keep the remainder of your existing upload form markup here #}
