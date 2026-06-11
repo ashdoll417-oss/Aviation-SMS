@@ -567,13 +567,41 @@ def create_app(config_class=Config):
     @login_required
     def safety_assurance():
         user_id = session.get('user_id')
-        latest = (
+
+        assurances = (
             SafetyAssurance.query
             .filter_by(user_id=user_id)
             .order_by(SafetyAssurance.audit_date.desc())
-            .first()
+            .all()
         )
-        return render_template('safety_assurance.html', latest=latest)
+
+        latest = assurances[0] if assurances else None
+        return render_template('safety_assurance.html', latest=latest, assurances=assurances)
+
+    @app.route('/safety/download-plan/<int:record_id>')
+    @login_required
+    def download_plan(record_id: int):
+        import base64
+
+        record = SafetyAssurance.query.get_or_404(record_id)
+
+        # Optional: enforce user-level access (keeps consistent with existing page filtering).
+        user_id = session.get('user_id')
+        if getattr(record, 'user_id', None) is not None and record.user_id != user_id:
+            flash('You do not have access to this plan.')
+            return redirect(url_for('safety_assurance'))
+
+        if not record.audit_plan_data:
+            flash('No audit plan data found for this record.')
+            return redirect(url_for('safety_assurance'))
+
+        raw_bytes = base64.b64decode(record.audit_plan_data)
+
+        return send_file(
+            BytesIO(raw_bytes),
+            as_attachment=True,
+            download_name=record.audit_plan_filename or f'safety_assurance_plan_{record.id}'
+        )
 
     @app.route('/safety/assurance', methods=['POST'])
     @login_required

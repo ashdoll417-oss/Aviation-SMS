@@ -135,5 +135,50 @@
     </div>
   </div>
 
+  <div class="card shadow-sm mt-4">
+    <div class="card-header bg-white">
+      <strong>Saved Safety Assurance Records</strong>
+    </div>
+
+    <div class="card-body p-0">
+      {% if assurances and assurances|length > 0 %}
+      <div class="table-responsive">
+        <table class="table table-striped mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width: 220px;">Audit Scope</th>
+              <th style="min-width: 160px;">Target Month</th>
+              <th style="width: 180px;">Audit Plan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in assurances %}
+            <tr>
+              <td>{{ record.audit_scope or '-' }}</td>
+              <td>{{ record.target_month or '-' }}</td>
+              <td>
+                {% if record.audit_plan_data %}
+                  <a class="btn btn-sm btn-primary"
+                     href="{{ url_for('download_plan', record_id=record.id) }}"
+                     title="Download audit plan">
+                    Download
+                  </a>
+                {% else %}
+                  <span class="text-muted">No plan</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-3">
+        <div class="text-muted">No safety assurance records found.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
 </div>
 {% endblock %}
