@@ -583,6 +583,7 @@ def create_app(config_class=Config):
             flash('Please log in to access this page.')
             return redirect(url_for('login'))
 
+        import base64
         from datetime import datetime
 
         def parse_date(date_str):
@@ -630,11 +631,12 @@ def create_app(config_class=Config):
 
         next_audit_date = parse_date(next_audit_date_str) if next_audit_date_str else None
 
-        # File management & safe save
+        # File processing: read from memory and store as Base64 in DB
         file = request.files.get('audit_plan')
         audit_plan_filename = None
+        audit_plan_data = None
 
-        if file and file.filename and file.filename.strip():
+        if file and file.filename != '':
             allowed_ext = {'.pdf', '.docx', '.xlsx'}
             safe_name = secure_filename(file.filename)
             ext = os.path.splitext(safe_name)[1].lower()
@@ -642,16 +644,11 @@ def create_app(config_class=Config):
                 flash('Invalid file type. Allowed: PDF, DOCX, XLSX.')
                 return redirect(url_for('safety_assurance'))
 
-            upload_dir = os.path.join('static', 'uploads', 'safety_assurance')
-            os.makedirs(upload_dir, exist_ok=True)
+            file_bytes = file.read()
+            encoded_string = base64.b64encode(file_bytes).decode('utf-8')
 
-            name_root, _ = os.path.splitext(safe_name)
-            unique_suffix = int(datetime.utcnow().timestamp())
-            final_filename = f"{name_root}_{unique_suffix}{ext}"
-
-            save_path = os.path.join(upload_dir, final_filename)
-            file.save(save_path)
-            audit_plan_filename = final_filename
+            audit_plan_filename = file.filename
+            audit_plan_data = encoded_string
 
         # Upsert by (user_id, audit_date)
         assurance = SafetyAssurance.query.filter_by(user_id=user_id, audit_date=audit_date).first()
@@ -677,9 +674,10 @@ def create_app(config_class=Config):
         assurance.target_month = target_month
         assurance.department_notified = dept_notified
 
-        # Only set filename if a new file was uploaded
-        if audit_plan_filename is not None:
+        # Only set file fields if a new file was uploaded
+        if audit_plan_filename is not None and audit_plan_data is not None:
             assurance.audit_plan_filename = audit_plan_filename
+            assurance.audit_plan_data = audit_plan_data
 
         try:
             db.session.commit()

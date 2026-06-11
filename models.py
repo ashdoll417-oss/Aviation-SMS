@@ -83,7 +83,8 @@ class SafetyAssurance(db.Model):
     status = db.Column(db.String(100), nullable=True)
     next_audit_date = db.Column(db.DateTime, nullable=True)
 
-    audit_plan_filename = db.Column(db.String(255), nullable=True)
+    audit_plan_filename = db.Column(db.Text, nullable=True)  # Stores original name
+    audit_plan_data = db.Column(db.Text, nullable=True)      # Stores the Base64 data string
 
     audit_scope = db.Column(db.String(255), nullable=True)
     target_month = db.Column(db.String(50), nullable=True)
