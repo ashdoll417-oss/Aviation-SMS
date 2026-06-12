@@ -631,6 +631,14 @@ def create_app(config_class=Config):
 
             s = str(date_str).strip()
 
+            # If we got a datetime-local-ish value, normalize it once so parsing is predictable.
+            # Examples:
+            #   2026-07-15T14:30      -> keep as-is OR try with 'T'
+            #   2026-07-15T14:30:00   -> keep as-is
+            #   Sometimes inputs can also send 'Z'
+            if s.endswith('Z'):
+                s = s[:-1]
+
             # Your flatpickr-style strings:
             # "04/22/2026, 03:00 PM" or "04/20/2027, 10:00 AM"
             for fmt in ('%m/%d/%Y, %I:%M %p', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
@@ -639,10 +647,17 @@ def create_app(config_class=Config):
                 except ValueError:
                     continue
 
-            # Additional safe fallbacks for inputs that may arrive from <input type="datetime-local">
+            # datetime-local safe fallbacks (with 'T' and without 'T')
             for fmt in ('%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S'):
                 try:
                     return datetime.strptime(s, fmt)
+                except ValueError:
+                    continue
+
+            s_space = s.replace('T', ' ')
+            for fmt in ('%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S'):
+                try:
+                    return datetime.strptime(s_space, fmt)
                 except ValueError:
                     continue
 
