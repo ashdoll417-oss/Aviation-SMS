@@ -674,8 +674,14 @@ def create_app(config_class=Config):
             flash('Audit Date is required.')
             return redirect(url_for('safety_assurance'))
 
-        audit_date = parse_date(audit_date_str)
-        if audit_date is None:
+        # DATE PARSING FIX (Supabase/SQLAlchemy date column compatibility):
+        # Convert incoming browser datetime strings (may include 'T') into a clean Python date.
+        try:
+            audit_date_s = str(audit_date_str).strip()
+            if 'T' in audit_date_s:
+                audit_date_s = audit_date_s.split('T')[0]
+            audit_date = datetime.strptime(audit_date_s, '%Y-%m-%d').date()
+        except Exception:
             flash('Invalid Audit Date format.')
             return redirect(url_for('safety_assurance'))
 
@@ -693,7 +699,17 @@ def create_app(config_class=Config):
         # Explicit checkbox boolean safety
         dept_notified = True if request.form.get('department_notified') else False
 
-        next_audit_date = parse_date(next_audit_date_str) if next_audit_date_str else None
+        # Convert next audit date into a Python date (or None)
+        if next_audit_date_str:
+            try:
+                next_audit_date_s = str(next_audit_date_str).strip()
+                if 'T' in next_audit_date_s:
+                    next_audit_date_s = next_audit_date_s.split('T')[0]
+                next_audit_date = datetime.strptime(next_audit_date_s, '%Y-%m-%d').date()
+            except Exception:
+                next_audit_date = None
+        else:
+            next_audit_date = None
 
         # File processing: read from memory and store as Base64 in DB (audit plan)
         file = request.files.get('audit_plan')
@@ -784,7 +800,22 @@ def create_app(config_class=Config):
                     recipients=[auditee_email]
                 )
 
-                msg.body = notification_body if notification_body else "An audit plan and checklist have been uploaded for your review."
+                # Action links for email-based response
+                accept_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=accept&audit_id={assurance.id}"
+                reject_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=reject&audit_id={assurance.id}"
+
+                base_body = (
+                    notification_body
+                    if notification_body
+                    else "An audit plan and checklist have been uploaded for your review."
+                )
+
+                msg.body = (
+                    f"{base_body}\n\n"
+                    f"Respond to this audit:\n"
+                    f"✅ ACCEPT: {accept_url}\n"
+                    f"❌ REJECT: {reject_url}\n"
+                )
 
                 # ATTACH THE ACTUAL FILES TO THE EMAIL
                 audit_plan_file = request.files.get('audit_plan')
