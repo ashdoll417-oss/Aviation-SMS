@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, current_app
 from flask import send_from_directory
+from flask_mail import Mail, Message
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -41,7 +42,17 @@ def create_app(config_class=Config):
         app.config['SECRET_KEY'] = getattr(config_class, 'SECRET_KEY', None) or 'aviation-sms-erp-dev-secret-key-2024'
 
     app.secret_key = app.config['SECRET_KEY']
-    
+
+    # --- Email (Flask-Mail) configuration via environment variables ---
+    app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+    app.config['MAIL_PORT'] = 587
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+    app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+    app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
+
+    mail = Mail(app)
+
     db.init_app(app)
     migrate.init_app(app, db)
     
@@ -708,7 +719,6 @@ def create_app(config_class=Config):
                 checklist_data=checklist_data,
                 user_id=user_id
             )
-            db.session.add(assurance)
 
         # Update fields explicitly
         assurance.finding_details = finding_details
@@ -733,6 +743,7 @@ def create_app(config_class=Config):
             assurance.audit_plan_data = audit_plan_data
 
         try:
+            db.session.add(assurance)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -740,6 +751,18 @@ def create_app(config_class=Config):
             current_app.logger.error(str(e))
             flash('Database error while saving Safety Assurance record.')
             return redirect(url_for('safety_assurance'))
+
+        # Optional email dispatch after successful DB commit (never crash the server)
+        if auditee_email:
+            try:
+                msg = Message(
+                    subject=f"New Safety Audit Notification: {request.form.get('audit_scope', 'Schedules')}",
+                    recipients=[auditee_email]
+                )
+                msg.body = notification_body if notification_body else "An audit plan and checklist have been uploaded for your review."
+                mail.send(msg)
+            except Exception as mail_err:
+                print(f"Mail dispatch skipped or failed: {mail_err}")
 
         flash('Safety Assurance record saved successfully.')
         return redirect(url_for('safety_assurance'))
