@@ -77,9 +77,25 @@
               </div>
             </div>
 
-            <div class="col-md-12 text-end">
-              <button type="submit" class="btn btn-success px-4">Save Audit Record</button>
+            <div class="col-md-12">
+              <label class="form-label" for="audit_checklist">Upload Audit Checklist File</label>
+              <input id="audit_checklist" type="file" name="audit_checklist" class="form-control" />
             </div>
+
+            <div class="col-md-12">
+              <label class="form-label" for="auditee_email">Recipient Auditee Email(s)</label>
+              <input id="auditee_email" type="text" name="auditee_email" class="form-control" placeholder="e.g., manager@domain.com" />
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label" for="notification_body">Notification Email Body Message</label>
+              <textarea id="notification_body" name="notification_body" class="form-control" rows="4" placeholder="Enter custom notification message details here..."></textarea>
+            </div>
+
+            <div class="col-md-12">
+              <button type="submit" class="btn btn-primary w-100">Save Audit Record</button>
+            </div>
+
           </div>
         </form>
       </div>

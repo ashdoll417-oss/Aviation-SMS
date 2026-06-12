@@ -651,6 +651,10 @@ def create_app(config_class=Config):
         finding_details = request.form.get('finding_details')
         next_audit_date_str = request.form.get('next_audit_date')
 
+        # New notification/audit checklist fields
+        auditee_email = request.form.get('auditee_email')
+        notification_body = request.form.get('notification_body')
+
         audit_scope = request.form.get('audit_scope')
         target_month = request.form.get('target_month')
 
@@ -659,7 +663,7 @@ def create_app(config_class=Config):
 
         next_audit_date = parse_date(next_audit_date_str) if next_audit_date_str else None
 
-        # File processing: read from memory and store as Base64 in DB
+        # File processing: read from memory and store as Base64 in DB (audit plan)
         file = request.files.get('audit_plan')
         audit_plan_filename = None
         audit_plan_data = None
@@ -678,6 +682,14 @@ def create_app(config_class=Config):
             audit_plan_filename = file.filename
             audit_plan_data = encoded_string
 
+        # New: audit checklist file (store raw binary + original filename)
+        checklist_file = request.files.get('audit_checklist')
+        checklist_name = None
+        checklist_data = None
+        if checklist_file and checklist_file.filename:
+            checklist_name = checklist_file.filename
+            checklist_data = checklist_file.read()
+
         # Upsert by (user_id, audit_date)
         assurance = SafetyAssurance.query.filter_by(user_id=user_id, audit_date=audit_date).first()
         is_new = assurance is None
@@ -690,6 +702,10 @@ def create_app(config_class=Config):
                 audit_scope=audit_scope,
                 target_month=target_month,
                 department_notified=dept_notified,
+                auditee_email=auditee_email,
+                notification_body=notification_body,
+                checklist_name=checklist_name,
+                checklist_data=checklist_data,
                 user_id=user_id
             )
             db.session.add(assurance)
@@ -701,6 +717,15 @@ def create_app(config_class=Config):
         assurance.audit_scope = audit_scope
         assurance.target_month = target_month
         assurance.department_notified = dept_notified
+
+        # Update new notification/audit checklist fields safely
+        assurance.auditee_email = auditee_email
+        assurance.notification_body = notification_body
+
+        # Only overwrite checklist fields if a new file was uploaded
+        if checklist_name is not None and checklist_data is not None:
+            assurance.checklist_name = checklist_name
+            assurance.checklist_data = checklist_data
 
         # Only set file fields if a new file was uploaded
         if audit_plan_filename is not None and audit_plan_data is not None:

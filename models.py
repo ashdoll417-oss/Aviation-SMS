@@ -86,6 +86,11 @@ class SafetyAssurance(db.Model):
     audit_plan_filename = db.Column(db.Text, nullable=True)  # Stores original name
     audit_plan_data = db.Column(db.Text, nullable=True)      # Stores the Base64 data string
 
+    auditee_email = db.Column(db.String(255), nullable=True)
+    notification_body = db.Column(db.Text, nullable=True)
+    checklist_name = db.Column(db.String(255), nullable=True)
+    checklist_data = db.Column(db.LargeBinary, nullable=True)
+
     audit_scope = db.Column(db.String(255), nullable=True)
     target_month = db.Column(db.String(50), nullable=True)
 
