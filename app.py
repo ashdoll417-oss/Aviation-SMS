@@ -631,6 +631,12 @@ def create_app(config_class=Config):
 
             s = str(date_str).strip()
 
+            # DATE PARSING FIX:
+            # Browser datetime-local values may include 'T' (e.g. '2026-06-12T13:45').
+            # Normalize explicitly to clean 'YYYY-MM-DD' so DB date columns match perfectly.
+            if 'T' in s:
+                s = s.split('T')[0]
+
             # If we got a datetime-local-ish value, normalize it once so parsing is predictable.
             # Examples:
             #   2026-07-15T14:30      -> keep as-is OR try with 'T'
@@ -703,6 +709,8 @@ def create_app(config_class=Config):
                 return redirect(url_for('safety_assurance'))
 
             file_bytes = file.read()
+            file.seek(0)  # Reset pointer just in case
+
             encoded_string = base64.b64encode(file_bytes).decode('utf-8')
 
             audit_plan_filename = file.filename
@@ -715,6 +723,7 @@ def create_app(config_class=Config):
         if checklist_file and checklist_file.filename:
             checklist_name = checklist_file.filename
             checklist_data = checklist_file.read()
+            checklist_file.seek(0)  # Reset pointer just in case
 
         # Upsert by (user_id, audit_date)
         assurance = SafetyAssurance.query.filter_by(user_id=user_id, audit_date=audit_date).first()
@@ -774,7 +783,32 @@ def create_app(config_class=Config):
                     subject=f"New Safety Audit Notification: {request.form.get('audit_scope', 'Schedules')}",
                     recipients=[auditee_email]
                 )
+
                 msg.body = notification_body if notification_body else "An audit plan and checklist have been uploaded for your review."
+
+                # ATTACH THE ACTUAL FILES TO THE EMAIL
+                audit_plan_file = request.files.get('audit_plan')
+                audit_checklist_file = request.files.get('audit_checklist')
+
+                if audit_plan_file and audit_plan_file.filename != '':
+                    # Ensure we read from start
+                    audit_plan_file.seek(0)
+                    msg.attach(
+                        filename=audit_plan_file.filename,
+                        content_type=audit_plan_file.content_type,
+                        data=audit_plan_file.read()
+                    )
+                    audit_plan_file.seek(0)
+
+                if audit_checklist_file and audit_checklist_file.filename != '':
+                    audit_checklist_file.seek(0)
+                    msg.attach(
+                        filename=audit_checklist_file.filename,
+                        content_type=audit_checklist_file.content_type,
+                        data=audit_checklist_file.read()
+                    )
+                    audit_checklist_file.seek(0)
+
                 mail.send(msg)
             except Exception as mail_err:
                 print(f"Mail dispatch skipped or failed: {mail_err}")
