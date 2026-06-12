@@ -678,9 +678,7 @@ def create_app(config_class=Config):
         # Convert incoming browser datetime strings (may include 'T') into a clean Python date.
         try:
             audit_date_s = str(audit_date_str).strip()
-            if 'T' in audit_date_s:
-                audit_date_s = audit_date_s.split('T')[0]
-            audit_date = datetime.strptime(audit_date_s, '%Y-%m-%d').date()
+            audit_date = datetime.strptime(audit_date_s.split('T')[0], '%Y-%m-%d').date()
         except Exception:
             flash('Invalid Audit Date format.')
             return redirect(url_for('safety_assurance'))
@@ -703,9 +701,7 @@ def create_app(config_class=Config):
         if next_audit_date_str:
             try:
                 next_audit_date_s = str(next_audit_date_str).strip()
-                if 'T' in next_audit_date_s:
-                    next_audit_date_s = next_audit_date_s.split('T')[0]
-                next_audit_date = datetime.strptime(next_audit_date_s, '%Y-%m-%d').date()
+                next_audit_date = datetime.strptime(next_audit_date_s.split('T')[0], '%Y-%m-%d').date()
             except Exception:
                 next_audit_date = None
         else:
@@ -783,7 +779,9 @@ def create_app(config_class=Config):
             assurance.audit_plan_data = audit_plan_data
 
         try:
+            # FORCE DATABASE FLUSH FIRST (assign assurance.id right away for email links)
             db.session.add(assurance)
+            db.session.flush()
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -810,6 +808,35 @@ def create_app(config_class=Config):
                     else "An audit plan and checklist have been uploaded for your review."
                 )
 
+                msg.html = f"""
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #2b2b2b; color: #ffffff; padding: 15px; text-align: center; font-weight: bold; font-size: 18px;">
+        INTERNAL AUDIT NOTIFICATION - AISL-SD-001
+    </div>
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; color: #333333; padding: 20px; border: 1px solid #dddddd;">
+        <h3 style="color: #0056b3; border-bottom: 2px solid #0056b3; padding-bottom: 5px;">AUDIT DETAILS</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Audit Scope:</td><td style="padding: 8px; border: 1px solid #ddd;">{assurance.audit_scope}</td></tr>
+            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Schedule:</td><td style="padding: 8px; border: 1px solid #ddd;">{assurance.target_month}</td></tr>
+            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Auditor:</td><td style="padding: 8px; border: 1px solid #ddd;">Head of Safety Office</td></tr>
+        </table>
+        
+        <p><strong>Preparation Notice:</strong><br>
+        In accordance with safety management systems, please be advised of the scheduled audit. Preparation should follow the relevant compliance frameworks.</p>
+        
+        <div style="background-color: #e9f2fb; border: 1px solid #b6d4fe; padding: 15px; text-align: center; margin-top: 20px; border-radius: 5px;">
+            <h4 style="margin-top: 0; color: #084298;">📋 AUDIT SCHEDULE ACKNOWLEDGEMENT</h4>
+            <p style="font-size: 14px;">Please confirm your acceptance of this audit schedule or request rescheduling:</p>
+            <a href="https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=accept&audit_id={assurance.id}" style="background-color: #0056b3; color: white; padding: 10px 20px; text-decoration: none; font-weight: bold; border-radius: 4px; margin-right: 10px; display: inline-block;">✓ Accept Audit Schedule</a>
+            <a href="https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=reschedule&audit_id={assurance.id}" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block;">✗ Request Reschedule</a>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+                # Optional plain-text fallback (some mail clients ignore html)
                 msg.body = (
                     f"{base_body}\n\n"
                     f"Respond to this audit:\n"
