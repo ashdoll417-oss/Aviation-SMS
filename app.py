@@ -622,96 +622,38 @@ def create_app(config_class=Config):
             flash('Please log in to access this page.')
             return redirect(url_for('login'))
 
+        # File helpers
+        file = request.files.get('audit_plan')
+        checklist_file = request.files.get('audit_checklist')
+
         import base64
         from datetime import datetime
 
-        def parse_date(date_str):
-            if not date_str:
-                return None
+        audit_date_in = request.form.get('audit_date')
+        next_audit_date_in = request.form.get('next_audit_date')
 
-            s = str(date_str).strip()
-
-            # DATE PARSING FIX:
-            # Browser datetime-local values may include 'T' (e.g. '2026-06-12T13:45').
-            # Normalize explicitly to clean 'YYYY-MM-DD' so DB date columns match perfectly.
-            if 'T' in s:
-                s = s.split('T')[0]
-
-            # If we got a datetime-local-ish value, normalize it once so parsing is predictable.
-            # Examples:
-            #   2026-07-15T14:30      -> keep as-is OR try with 'T'
-            #   2026-07-15T14:30:00   -> keep as-is
-            #   Sometimes inputs can also send 'Z'
-            if s.endswith('Z'):
-                s = s[:-1]
-
-            # Your flatpickr-style strings:
-            # "04/22/2026, 03:00 PM" or "04/20/2027, 10:00 AM"
-            for fmt in ('%m/%d/%Y, %I:%M %p', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
-                try:
-                    return datetime.strptime(s, fmt)
-                except ValueError:
-                    continue
-
-            # datetime-local safe fallbacks (with 'T' and without 'T')
-            for fmt in ('%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S'):
-                try:
-                    return datetime.strptime(s, fmt)
-                except ValueError:
-                    continue
-
-            s_space = s.replace('T', ' ')
-            for fmt in ('%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S'):
-                try:
-                    return datetime.strptime(s_space, fmt)
-                except ValueError:
-                    continue
-
-            return None
-
-        audit_date_str = request.form.get('audit_date')
-        if not audit_date_str:
-            flash('Audit Date is required.')
-            return redirect(url_for('safety_assurance'))
-
-        # DATE PARSING FIX (Supabase/SQLAlchemy date column compatibility):
-        # Convert incoming browser datetime strings (may include 'T') into a clean Python date.
+        # 1. DATE FIX & DATABASE SAVE FIRST (exact structure requested)
         try:
-            audit_date_s = str(audit_date_str).strip()
-            audit_date = datetime.strptime(audit_date_s.split('T')[0], '%Y-%m-%d').date()
+            parsed_audit_date = datetime.strptime(audit_date_in.split('T')[0], '%Y-%m-%d').date() if audit_date_in else None
+            parsed_next_date = datetime.strptime(next_audit_date_in.split('T')[0], '%Y-%m-%d').date() if next_audit_date_in else None
         except Exception:
-            flash('Invalid Audit Date format.')
-            return redirect(url_for('safety_assurance'))
+            parsed_audit_date = datetime.utcnow().date()
+            parsed_next_date = None
+
+        # Set SQLAlchemy-searchable variables
+        audit_date = parsed_audit_date
+        next_audit_date = parsed_next_date
 
         status = request.form.get('status') or 'Open'
         finding_details = request.form.get('finding_details')
-        next_audit_date_str = request.form.get('next_audit_date')
-
-        # New notification/audit checklist fields
         auditee_email = request.form.get('auditee_email')
         notification_body = request.form.get('notification_body')
-
         audit_scope = request.form.get('audit_scope')
         target_month = request.form.get('target_month')
-
-        # Explicit checkbox boolean safety
         dept_notified = True if request.form.get('department_notified') else False
 
-        # Convert next audit date into a Python date (or None)
-        if next_audit_date_str:
-            try:
-                next_audit_date_s = str(next_audit_date_str).strip()
-                next_audit_date = datetime.strptime(next_audit_date_s.split('T')[0], '%Y-%m-%d').date()
-            except Exception:
-                next_audit_date = None
-        else:
-            next_audit_date = None
-
-        # File processing: read from memory and store as Base64 in DB (audit plan)
-        file = request.files.get('audit_plan')
         audit_plan_filename = None
         audit_plan_data = None
-
         if file and file.filename != '':
             allowed_ext = {'.pdf', '.docx', '.xlsx'}
             safe_name = secure_filename(file.filename)
@@ -721,26 +663,19 @@ def create_app(config_class=Config):
                 return redirect(url_for('safety_assurance'))
 
             file_bytes = file.read()
-            file.seek(0)  # Reset pointer just in case
-
-            encoded_string = base64.b64encode(file_bytes).decode('utf-8')
-
+            file.seek(0)
             audit_plan_filename = file.filename
-            audit_plan_data = encoded_string
+            audit_plan_data = base64.b64encode(file_bytes).decode('utf-8')
 
-        # New: audit checklist file (store raw binary + original filename)
-        checklist_file = request.files.get('audit_checklist')
         checklist_name = None
         checklist_data = None
         if checklist_file and checklist_file.filename:
             checklist_name = checklist_file.filename
             checklist_data = checklist_file.read()
-            checklist_file.seek(0)  # Reset pointer just in case
+            checklist_file.seek(0)
 
-        # Upsert by (user_id, audit_date)
         assurance = SafetyAssurance.query.filter_by(user_id=user_id, audit_date=audit_date).first()
-        is_new = assurance is None
-        if is_new:
+        if assurance is None:
             assurance = SafetyAssurance(
                 audit_date=audit_date,
                 finding_details=finding_details,
@@ -753,35 +688,37 @@ def create_app(config_class=Config):
                 notification_body=notification_body,
                 checklist_name=checklist_name,
                 checklist_data=checklist_data,
-                user_id=user_id
+                user_id=user_id,
             )
 
-        # Update fields explicitly
+        # Assign fields, including tenant-safe assignment, then commit BEFORE email code
+        assurance.audit_date = parsed_audit_date
+        assurance.next_audit_date = parsed_next_date
+
+        # Safe Tenant Context Assignment (never throws AttributeError)
+        user_record = User.query.get(session.get('user_id')) if session.get('user_id') else None
+        if user_record and hasattr(user_record, 'tenant_id') and hasattr(assurance, 'tenant_id'):
+            assurance.tenant_id = user_record.tenant_id
+
         assurance.finding_details = finding_details
         assurance.status = status
-        assurance.next_audit_date = next_audit_date
         assurance.audit_scope = audit_scope
         assurance.target_month = target_month
         assurance.department_notified = dept_notified
-
-        # Update new notification/audit checklist fields safely
         assurance.auditee_email = auditee_email
         assurance.notification_body = notification_body
 
-        # Only overwrite checklist fields if a new file was uploaded
         if checklist_name is not None and checklist_data is not None:
             assurance.checklist_name = checklist_name
             assurance.checklist_data = checklist_data
 
-        # Only set file fields if a new file was uploaded
         if audit_plan_filename is not None and audit_plan_data is not None:
             assurance.audit_plan_filename = audit_plan_filename
             assurance.audit_plan_data = audit_plan_data
 
+        # 2. DATE FIX & DATABASE SAVE FIRST (commit immediately BEFORE executing the email code)
         try:
-            # FORCE DATABASE FLUSH FIRST (assign assurance.id right away for email links)
             db.session.add(assurance)
-            db.session.flush()
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -790,71 +727,68 @@ def create_app(config_class=Config):
             flash('Database error while saving Safety Assurance record.')
             return redirect(url_for('safety_assurance'))
 
-        # Optional email dispatch after successful DB commit (never crash the server)
-        if auditee_email:
-            try:
+        # 3. HTML EMAIL LAYOUT WITH INTERACTIVE ACTIONS + 4. TOTAL ISOLATION SAFEGUARD
+        try:
+            if auditee_email:
                 msg = Message(
                     subject=f"New Safety Audit Notification: {request.form.get('audit_scope', 'Schedules')}",
-                    recipients=[auditee_email]
+                    recipients=[auditee_email],
                 )
 
-                # Action links for email-based response
-                accept_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=accept&audit_id={assurance.id}"
-                reject_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=reject&audit_id={assurance.id}"
-
-                base_body = (
-                    notification_body
-                    if notification_body
-                    else "An audit plan and checklist have been uploaded for your review."
-                )
+                audit_id_str = str(assurance.id) if assurance.id else "PENDING"
+                accept_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=accept&audit_id={audit_id_str}"
+                reschedule_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=reschedule&audit_id={audit_id_str}"
 
                 msg.html = f"""
 <html>
-<body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;">
-    <div style="max-width: 600px; margin: 0 auto; background-color: #2b2b2b; color: #ffffff; padding: 15px; text-align: center; font-weight: bold; font-size: 18px;">
-        INTERNAL AUDIT NOTIFICATION - AISL-SD-001
+<body style="font-family: Arial, sans-serif; background-color: #1a1a1a; color: #ffffff; margin: 0; padding: 20px;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #2b2b2b; border: 1px solid #444; padding: 15px; text-align: center;">
+        <span style="font-size: 18px; font-weight: bold; color: #ffffff; letter-spacing: 1px;">INTERNAL AUDIT NOTIFICATION - AISL-SD-001</span><br>
+        <span style="font-size: 13px; color: #b3b3b3;">Aero Instrument Service Limited (AISL) | Workshop ID: K/AMO/L/016</span>
     </div>
-    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; color: #333333; padding: 20px; border: 1px solid #dddddd;">
-        <h3 style="color: #0056b3; border-bottom: 2px solid #0056b3; padding-bottom: 5px;">AUDIT DETAILS</h3>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Audit Scope:</td><td style="padding: 8px; border: 1px solid #ddd;">{assurance.audit_scope}</td></tr>
-            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Schedule:</td><td style="padding: 8px; border: 1px solid #ddd;">{assurance.target_month}</td></tr>
-            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Auditor:</td><td style="padding: 8px; border: 1px solid #ddd;">Head of Safety Office</td></tr>
+    
+    <div style="max-width: 600px; margin: 0 auto; background-color: #242424; border-left: 1px solid #444; border-right: 1px solid #444; border-bottom: 1px solid #444; padding: 20px; color: #dddddd;">
+        <h4 style="color: #ffc107; border-bottom: 1px solid #444; padding-bottom: 5px; margin-top: 0;">AUDIT DETAILS</h4>
+        <table style="width: 100%; color: #dddddd; font-size: 14px; margin-bottom: 20px;">
+            <tr><td style="padding: 5px; width: 30%; font-weight: bold; color: #aaaaaa;">Audit Area:</td><td style="padding: 5px;">{assurance.audit_scope if assurance.audit_scope else 'Maintenance Facilities'}</td></tr>
+            <tr><td style="padding: 5px; font-weight: bold; color: #aaaaaa;">Auditor:</td><td style="padding: 5px;">Head of Safety Office</td></tr>
+            <tr><td style="padding: 5px; font-weight: bold; color: #aaaaaa;">Schedule:</td><td style="padding: 5px;">{assurance.target_month if assurance.target_month else 'Scheduled Month'}</td></tr>
         </table>
         
-        <p><strong>Preparation Notice:</strong><br>
-        In accordance with safety management systems, please be advised of the scheduled audit. Preparation should follow the relevant compliance frameworks.</p>
+        <p style="font-size: 14px; line-height: 1.5;">
+            <strong>Preparation Notice:</strong><br>
+            In accordance with <strong>AISL-005 (SMM)</strong>, please be advised of the scheduled audit. Preparation should follow the <strong>AISL-SD-002C</strong> checklist.
+        </p>
         
-        <div style="background-color: #e9f2fb; border: 1px solid #b6d4fe; padding: 15px; text-align: center; margin-top: 20px; border-radius: 5px;">
-            <h4 style="margin-top: 0; color: #084298;">📋 AUDIT SCHEDULE ACKNOWLEDGEMENT</h4>
-            <p style="font-size: 14px;">Please confirm your acceptance of this audit schedule or request rescheduling:</p>
-            <a href="https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=accept&audit_id={assurance.id}" style="background-color: #0056b3; color: white; padding: 10px 20px; text-decoration: none; font-weight: bold; border-radius: 4px; margin-right: 10px; display: inline-block;">✓ Accept Audit Schedule</a>
-            <a href="https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=reschedule&audit_id={assurance.id}" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block;">✗ Request Reschedule</a>
+        <div style="background-color: #2d3748; border: 1px solid #4a5568; padding: 15px; text-align: center; margin-top: 25px; border-radius: 6px;">
+            <span style="font-size: 15px; font-weight: bold; color: #63b3ed;">📋 AUDIT SCHEDULE ACKNOWLEDGEMENT</span>
+            <p style="font-size: 13px; color: #cbd5e0; margin: 10px 0 15px 0;">Please confirm your acceptance of this audit schedule or request rescheduling:</p>
+            <a href="{accept_url}" style="background-color: #0056b3; color: white; padding: 10px 22px; text-decoration: none; font-weight: bold; border-radius: 4px; margin-right: 10px; display: inline-block; font-size: 13px;">✓ Accept Audit Schedule</a>
+            <a href="{reschedule_url}" style="background-color: #dc3545; color: white; padding: 10px 22px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block; font-size: 13px;">✗ Request Reschedule</a>
+            <br><span style="font-size: 11px; color: #a0aec0; display: inline-block; margin-top: 12px;">Audit ID: {audit_id_str}</span>
         </div>
     </div>
 </body>
 </html>
 """
 
-                # Optional plain-text fallback (some mail clients ignore html)
                 msg.body = (
-                    f"{base_body}\n\n"
-                    f"Respond to this audit:\n"
-                    f"✅ ACCEPT: {accept_url}\n"
-                    f"❌ REJECT: {reject_url}\n"
+                    f"{notification_body or 'Please review the audit schedule.'}\n\n"
+                    f"Audit ID: {audit_id_str}\n"
+                    f"Accept: {accept_url}\n"
+                    f"Reschedule: {reschedule_url}\n"
                 )
 
-                # ATTACH THE ACTUAL FILES TO THE EMAIL
+                # Best-effort attachments (will not break redirect)
                 audit_plan_file = request.files.get('audit_plan')
                 audit_checklist_file = request.files.get('audit_checklist')
 
                 if audit_plan_file and audit_plan_file.filename != '':
-                    # Ensure we read from start
                     audit_plan_file.seek(0)
                     msg.attach(
                         filename=audit_plan_file.filename,
-                        content_type=audit_plan_file.content_type,
-                        data=audit_plan_file.read()
+                        content_type=getattr(audit_plan_file, 'content_type', None),
+                        data=audit_plan_file.read(),
                     )
                     audit_plan_file.seek(0)
 
@@ -862,14 +796,17 @@ def create_app(config_class=Config):
                     audit_checklist_file.seek(0)
                     msg.attach(
                         filename=audit_checklist_file.filename,
-                        content_type=audit_checklist_file.content_type,
-                        data=audit_checklist_file.read()
+                        content_type=getattr(audit_checklist_file, 'content_type', None),
+                        data=audit_checklist_file.read(),
                     )
                     audit_checklist_file.seek(0)
 
                 mail.send(msg)
-            except Exception as mail_err:
-                print(f"Mail dispatch skipped or failed: {mail_err}")
+
+        except Exception as mail_err:
+            current_app.logger.error(f"Mail dispatch error: {mail_err}")
+            flash('Safety Assurance record saved successfully.')
+            return redirect(url_for('safety_assurance'))
 
         flash('Safety Assurance record saved successfully.')
         return redirect(url_for('safety_assurance'))
