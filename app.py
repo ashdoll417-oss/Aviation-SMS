@@ -11,7 +11,7 @@ from sqlalchemy import text, extract
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from config import Config
 from extensions import db, migrate
-from models import Component, RiskAssessment, SafetyPolicy, SafetyAssurance, SafetyPromotion, EmergencyResponsePlan, HazardReport, OccurrenceReport, SafetyObjective, SafetyDrill, EmergencyDrill as ModelsEmergencyDrill, User, LoginLog
+from models import Component, RiskAssessment, SafetyPolicy, SafetyAssurance, SafetyPromotion, EmergencyResponsePlan, HazardReport, OccurrenceReport, SafetyObjective, SafetyDrill, EmergencyDrill as ModelsEmergencyDrill, Tenant, User, LoginLog
 import pandas as pd
 from io import BytesIO
 from reportlab.pdfgen import canvas
@@ -241,6 +241,80 @@ def create_app(config_class=Config):
                 flash('Invalid username or password.')
 
         return render_template('login.html')
+
+    @app.route('/register', methods=['GET', 'POST'])
+    def register():
+        if request.method == 'POST':
+            form_company_name = request.form.get('company_name', '').strip()
+            form_full_name = request.form.get('full_name', '').strip()
+            form_email = request.form.get('email', '').strip().lower()
+            form_password = request.form.get('password', '')
+
+            if not form_company_name or not form_full_name or not form_email or not form_password:
+                flash('All fields are required.')
+                return redirect(url_for('register'))
+
+            # Basic password minimum (avoid empty/too-short)
+            if len(form_password) < 6:
+                flash('Password must be at least 6 characters.')
+                return redirect(url_for('register'))
+
+            hashed_password = generate_password_hash(form_password)
+
+            # Multi-tenant onboarding:
+            # 1) Create tenant first
+            try:
+                TenantCls = Tenant
+
+                # Optional uniqueness guard to return friendly error instead of DB exception
+                existing_tenant = TenantCls.query.filter_by(company_name=form_company_name).first()
+                if existing_tenant:
+                    flash('An organization with this company name already exists. Please sign in.')
+                    return redirect(url_for('login'))
+
+                existing_user = User.query.filter_by(email=form_email).first()
+                if existing_user:
+                    flash('An account with this email already exists. Please sign in.')
+                    return redirect(url_for('login'))
+
+                new_tenant = TenantCls(
+                    company_name=form_company_name,
+                    track_audits=True,
+                    track_risk_management=True
+                )
+                db.session.add(new_tenant)
+                db.session.commit()
+
+                # 2) Create admin user linked to that tenant
+                # Use a deterministic username for login compatibility. Current login expects `username`.
+                # We'll set username to email local-part if present, else email.
+                derived_username = form_email.split('@', 1)[0] or form_email
+
+                # Ensure derived username uniqueness
+                if User.query.filter_by(username=derived_username).first():
+                    derived_username = form_email
+
+                new_user = User(
+                    username=derived_username,
+                    email=form_email,
+                    password_hash=hashed_password,
+                    tenant_id=new_tenant.id,
+                    role='Administrator'
+                )
+                db.session.add(new_user)
+                db.session.commit()
+
+                # Safe login session
+                session['user_id'] = new_user.id
+                flash('Organization registered successfully!')
+                return redirect(url_for('dashboard'))
+
+            except SQLAlchemyError as e:
+                db.session.rollback()
+                flash('Registration failed due to a temporary database issue. Please try again.')
+                return redirect(url_for('register'))
+
+        return render_template('register.html')
 
     @app.route('/logout')
     def logout():

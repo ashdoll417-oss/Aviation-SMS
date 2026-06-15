@@ -2,12 +2,29 @@ from extensions import db
 from datetime import datetime
 from enum import Enum as PyEnum
 
+class Tenant(db.Model):
+    __tablename__ = 'tenant'
+
+    id = db.Column(db.Integer, primary_key=True)
+    company_name = db.Column(db.String(200), unique=True, nullable=False)
+
+    # Module feature flags / subscription toggles
+    track_audits = db.Column(db.Boolean, default=True, nullable=False)
+    track_risk_management = db.Column(db.Boolean, default=True, nullable=False)
+
+    def __repr__(self):
+        return f'<Tenant {self.company_name}>'
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
+
     password_hash = db.Column(db.String(128), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     role = db.Column(db.String(50), nullable=False)  # e.g., 'AMO Manager', 'Safety Officer'
+
+    # Multi-tenant linkage
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
 
     # Relationships
     components = db.relationship('Component', backref='assigned_user', lazy=True)

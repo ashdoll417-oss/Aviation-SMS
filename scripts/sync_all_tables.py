@@ -18,17 +18,33 @@ logger = logging.getLogger("sync_all_tables")
 # - We must not drop/rename columns; only create missing tables/columns.
 # - For emergency_response_plan, certain column names are quoted PascalCase.
 EXPECTED_TABLES = [
-    # 1) public.user (id SERIAL PRIMARY KEY)
+    # 1) public.tenant
+    {
+        "schema": "public",
+        "table": "tenant",
+        "columns": [
+            ("id", "SERIAL", "PRIMARY KEY"),
+            ("company_name", "TEXT", None),
+            ("track_audits", "BOOLEAN", None),
+            ("track_risk_management", "BOOLEAN", None),
+        ],
+        "fks": [],
+    },
+
+    # 2) public.user (id SERIAL PRIMARY KEY)
     {
         "schema": "public",
         "table": "user",
         "columns": [
             ("id", "SERIAL", "PRIMARY KEY"),
+            ("tenant_id", "INTEGER", None),
         ],
-        "fks": [],
+        "fks": [
+            ("tenant_id", "public", "tenant", "id"),
+        ],
     },
 
-    # 2) public.risk_assessment (standard columns as currently used by app)
+    # 3) public.risk_assessment (standard columns as currently used by app)
     {
         "schema": "public",
         "table": "risk_assessment",
