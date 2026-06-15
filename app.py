@@ -115,6 +115,82 @@ def create_app(config_class=Config):
             return f(*args, **kwargs)
         return decorated_function
 
+    def _safe_get_current_user():
+        """
+        Best-effort user lookup based on session user_id.
+        Returns None if session is missing or user cannot be fetched.
+        """
+        uid = session.get('user_id')
+        if not uid:
+            return None
+        try:
+            return User.query.get(uid)
+        except Exception:
+            return None
+
+    def _safe_get_current_tenant():
+        """
+        Best-effort tenant lookup:
+        - If User has a `tenant_id`, try to load Tenant model if present.
+        - Otherwise return None.
+        """
+        user = _safe_get_current_user()
+        if not user:
+            return None
+
+        tenant_id = getattr(user, 'tenant_id', None)
+        if not tenant_id:
+            return None
+
+        # Tenant model may or may not exist in this codebase yet.
+        tenant_cls = globals().get('Tenant') or globals().get('Tenants')
+        if tenant_cls is None:
+            return None
+
+        try:
+            return tenant_cls.query.get(tenant_id)
+        except Exception:
+            return None
+
+    def _safe_module_enabled(module_key: str) -> bool:
+        """
+        Best-effort module feature flags.
+        Defaults to True if tenant or flags are missing, to keep the app resilient.
+        Supported module_key values:
+          - 'audits' -> track_audits
+          - 'risk'   -> track_risk_management
+        """
+        tenant = _safe_get_current_tenant()
+        if tenant is None:
+            return True
+
+        if module_key == 'audits':
+            return bool(getattr(tenant, 'track_audits', True))
+        if module_key == 'risk':
+            return bool(getattr(tenant, 'track_risk_management', True))
+
+        # Unknown module: default to True
+        return True
+
+    def require_module(module_key: str):
+        """
+        Lightweight route decorator to guard module pages using best-effort
+        tenant subscription flags.
+
+        Uses inject_tenant_features() flags (via _safe_module_enabled()).
+        If a module is disabled: flash + redirect to /dashboard.
+        """
+        def decorator(f):
+            @wraps(f)
+            def wrapper(*args, **kwargs):
+                enabled = _safe_module_enabled(module_key)
+                if not enabled:
+                    flash('This module is not active for your organization\'s subscription plan.')
+                    return redirect(url_for('dashboard'))
+                return f(*args, **kwargs)
+            return wrapper
+        return decorator
+
     def send_reporter_feedback(hazard_id):
         hazard = HazardReport.query.get_or_404(hazard_id)
         message = f'Your report regarding {hazard.unsafe_event} has been reviewed. Action taken: {hazard.safety_actions or "None"}. Status: {hazard.status}.'
@@ -184,17 +260,42 @@ def create_app(config_class=Config):
     @login_required
     def dashboard():
         user = User.query.get(session['user_id'])
+
+        # Multi-tenant isolation (best-effort):
+        # If we can derive a tenant_id from the logged-in user and SafetyAssurance supports tenant_id,
+        # filter tenant-specific queries. For other models, we keep existing behavior unless
+        # their tenant filtering is explicitly supported in the codebase.
+        tenant_id = getattr(user, 'tenant_id', None) if user is not None else None
+
         components = Component.query.all()
         risks = RiskAssessment.query.all()
         policies = SafetyPolicy.query.all()
-        assurances = SafetyAssurance.query.all()
         promotions = SafetyPromotion.query.all()
         erps = EmergencyResponsePlan.query.all()
         hazards = HazardReport.query.all()
         occurrences = OccurrenceReport.query.all()
         objectives = SafetyObjective.query.all()
         drills = SafetyDrill.query.all()
-        return render_template('dashboard.html', user=user, components=components, risks=risks, policies=policies, assurances=assurances, promotions=promotions, erps=erps, hazards=hazards, occurrences=occurrences, objectives=objectives, drills=drills)
+
+        if tenant_id is not None and hasattr(SafetyAssurance, 'tenant_id'):
+            assurances = SafetyAssurance.query.filter_by(tenant_id=tenant_id).all()
+        else:
+            assurances = SafetyAssurance.query.all()
+
+        return render_template(
+            'dashboard.html',
+            user=user,
+            components=components,
+            risks=risks,
+            policies=policies,
+            assurances=assurances,
+            promotions=promotions,
+            erps=erps,
+            hazards=hazards,
+            occurrences=occurrences,
+            objectives=objectives,
+            drills=drills
+        )
 
     @app.route('/export/excel')
     def export_excel():
@@ -576,15 +677,33 @@ def create_app(config_class=Config):
 
     @app.route('/safety/assurance', methods=['GET'])
     @login_required
+    @require_module('audits')
     def safety_assurance():
         user_id = session.get('user_id')
 
-        assurances = (
-            SafetyAssurance.query
-            .filter_by(user_id=user_id)
-            .order_by(SafetyAssurance.audit_date.desc())
-            .all()
-        )
+        tenant_id = None
+        user = _safe_get_current_user()
+        if user is not None:
+            tenant_id = getattr(user, 'tenant_id', None)
+
+        base_q = SafetyAssurance.query
+
+        # Absolute isolation safeguard (best-effort):
+        # Always filter by user_id if present; additionally filter by tenant_id if the column exists.
+        if tenant_id is not None and hasattr(SafetyAssurance, 'tenant_id'):
+            assurances = (
+                base_q
+                .filter_by(tenant_id=tenant_id, user_id=user_id)
+                .order_by(SafetyAssurance.audit_date.desc())
+                .all()
+            )
+        else:
+            assurances = (
+                base_q
+                .filter_by(user_id=user_id)
+                .order_by(SafetyAssurance.audit_date.desc())
+                .all()
+            )
 
         latest = assurances[0] if assurances else None
         return render_template('safety_assurance.html', latest=latest, assurances=assurances)
@@ -616,6 +735,7 @@ def create_app(config_class=Config):
 
     @app.route('/safety/assurance', methods=['POST'])
     @login_required
+    @require_module('audits')
     def safety_assurance_post():
         user_id = session.get('user_id')
         if not user_id:
@@ -810,6 +930,44 @@ def create_app(config_class=Config):
 
         flash('Safety Assurance record saved successfully.')
         return redirect(url_for('safety_assurance'))
+
+    @app.context_processor
+    def inject_tenant_features():
+        """
+        Template context helper for feature flags.
+        Defensive lookup:
+          - Uses session.get('user_id') -> User record -> linked tenant fields (if present)
+          - Defaults to True when user/tenant/attributes are missing to keep app resilient.
+        """
+        tenant_features = {
+            'track_audits': True,
+            'track_risk_management': True,
+        }
+
+        user = _safe_get_current_user()
+        if user is None:
+            return tenant_features
+
+        # Tenant model may not exist yet; attempt best-effort loading via globals.
+        tenant_id = getattr(user, 'tenant_id', None)
+        if not tenant_id:
+            return tenant_features
+
+        tenant_cls = globals().get('Tenant') or globals().get('Tenants')
+        if tenant_cls is None:
+            return tenant_features
+
+        try:
+            tenant = tenant_cls.query.get(tenant_id)
+        except Exception:
+            tenant = None
+
+        if tenant is None:
+            return tenant_features
+
+        tenant_features['track_audits'] = bool(getattr(tenant, 'track_audits', True))
+        tenant_features['track_risk_management'] = bool(getattr(tenant, 'track_risk_management', True))
+        return tenant_features
 
     return app  # This MUST be the last line of the create_app function
 
