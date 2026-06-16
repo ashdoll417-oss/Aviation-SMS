@@ -123,18 +123,18 @@
             {% if records %}
               {% for record in records %}
               <tr>
-                <td>{{ record.audit_date.strftime('%m/%d/%Y') if record.audit_date else 'N/A' }}</td>
-                <td><strong>{{ record.audit_scope or 'N/A' }}</strong></td>
-                <td>{{ record.target_month or 'N/A' }}</td>
+                <td>{{ record['audit_date'].strftime('%m/%d/%Y') if record['audit_date'] else 'N/A' }}</td>
+                <td><strong>{{ record['audit_scope'] or 'N/A' }}</strong></td>
+                <td>{{ record['target_month'] or 'N/A' }}</td>
                 <td>
-                  <span class="badge {% if record.status == 'Closed' %}text-bg-success{% else %}text-bg-warning{% endif %}">
-                    {{ record.status }}
+                  <span class="badge {% if record['status'] == 'Closed' %}text-bg-success{% else %}text-bg-warning{% endif %}">
+                    {{ record['status'] }}
                   </span>
                 </td>
-                <td>{{ record.next_audit_date.strftime('%m/%d/%Y') if record.next_audit_date else 'N/A' }}</td>
+                <td>{{ record['next_audit_date'].strftime('%m/%d/%Y') if record['next_audit_date'] else 'N/A' }}</td>
                 <td class="text-end">
-                  {% if record.audit_plan_data %}
-                    <a href="{{ url_for('download_plan', record_id=record.id) }}" class="btn btn-sm btn-outline-primary">
+                  {% if record['audit_plan_data'] %}
+                    <a href="{{ url_for('download_plan', record_id=record['id']) }}" class="btn btn-sm btn-outline-primary">
                       <i class="bi bi-download"></i> Download Plan
                     </a>
                   {% else %}
@@ -142,13 +142,12 @@
                   {% endif %}
 
                   <a
-                    href="{{ url_for('send_audit_report', audit_id=record.id) }}"
-                    class="btn btn-sm btn-link text-primary me-2"
+                    href="{{ url_for('send_audit_report', audit_id=record['id']) }}"
+                    class="btn btn-sm btn-outline-primary me-2"
                     title="Send Audit Report to Auditee"
                     data-bs-toggle="tooltip"
                   >
-                    <i class="bi bi-envelope-paper-fill"></i>
-                    <i class="fas fa-paper-plane ms-1"></i>
+                    <i class="fa fa-envelope"></i> Send Report
                   </a>
                 </td>
               </tr>
