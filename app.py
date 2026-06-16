@@ -8,7 +8,7 @@ import os
 import sys
 import time
 from sqlalchemy import text, extract
-from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError
 from config import Config
 from extensions import db, migrate
 from models import Component, RiskAssessment, SafetyPolicy, SafetyAssurance, SafetyPromotion, EmergencyResponsePlan, HazardReport, OccurrenceReport, SafetyObjective, SafetyDrill, EmergencyDrill as ModelsEmergencyDrill, Tenant, User, LoginLog
@@ -286,6 +286,10 @@ def create_app(config_class=Config):
                 db.session.commit()
 
                 # 2) Create admin user linked to that tenant
+                # Ensure tenant_id is assigned using the generated Tenant UUID dynamically.
+                # Works whether Tenant.id is a UUID object or already a string.
+                tenant_id_value = str(new_tenant.id)
+
                 # Use a deterministic username for login compatibility. Current login expects `username`.
                 # We'll set username to email local-part if present, else email.
                 derived_username = form_email.split('@', 1)[0] or form_email
@@ -298,7 +302,7 @@ def create_app(config_class=Config):
                     username=derived_username,
                     email=form_email,
                     password_hash=hashed_password,
-                    tenant_id=new_tenant.id,
+                    tenant_id=tenant_id_value,
                     role='Administrator'
                 )
                 db.session.add(new_user)
@@ -309,7 +313,12 @@ def create_app(config_class=Config):
                 flash('Organization registered successfully!')
                 return redirect(url_for('dashboard'))
 
-            except SQLAlchemyError as e:
+            except IntegrityError:
+                db.session.rollback()
+                flash('This organization name is already registered.')
+                return redirect(url_for('register'))
+
+            except SQLAlchemyError:
                 db.session.rollback()
                 flash('Registration failed due to a temporary database issue. Please try again.')
                 return redirect(url_for('register'))
