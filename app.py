@@ -348,7 +348,11 @@ def create_app(config_class=Config):
         # If we can derive a tenant_id from the logged-in user and SafetyAssurance supports tenant_id,
         # filter tenant-specific queries. For other models, we keep existing behavior unless
         # their tenant filtering is explicitly supported in the codebase.
-        tenant_id = getattr(user, 'tenant_id', None) if user is not None else None
+        # Strict tenant isolation for SafetyAssurance:
+        # - If tenant_id is missing/unassigned: return absolutely nothing.
+        # - No global fallbacks.
+        active_user = _safe_get_current_user()
+        tenant_id = getattr(active_user, 'tenant_id', None)
 
         components = Component.query.all()
         risks = RiskAssessment.query.all()
@@ -360,10 +364,10 @@ def create_app(config_class=Config):
         objectives = SafetyObjective.query.all()
         drills = SafetyDrill.query.all()
 
-        if tenant_id is not None and hasattr(SafetyAssurance, 'tenant_id'):
+        if tenant_id:
             assurances = SafetyAssurance.query.filter_by(tenant_id=tenant_id).all()
         else:
-            assurances = SafetyAssurance.query.all()
+            assurances = []
 
         return render_template(
             'dashboard.html',
@@ -764,29 +768,21 @@ def create_app(config_class=Config):
     def safety_assurance():
         user_id = session.get('user_id')
 
-        tenant_id = None
-        user = _safe_get_current_user()
-        if user is not None:
-            tenant_id = getattr(user, 'tenant_id', None)
+        # Force tenant isolation for brand-new orgs:
+        # - If tenant_id is missing/unassigned: return [] (no global fallback queries).
+        # - If tenant_id exists: filter strictly by tenant_id (and user_id for internal UI context).
+        active_user = _safe_get_current_user()
+        tenant_id = getattr(active_user, 'tenant_id', None)
 
-        base_q = SafetyAssurance.query
-
-        # Absolute isolation safeguard (best-effort):
-        # Always filter by user_id if present; additionally filter by tenant_id if the column exists.
-        if tenant_id is not None and hasattr(SafetyAssurance, 'tenant_id'):
+        if tenant_id and hasattr(SafetyAssurance, 'tenant_id'):
             assurances = (
-                base_q
+                SafetyAssurance.query
                 .filter_by(tenant_id=tenant_id, user_id=user_id)
                 .order_by(SafetyAssurance.audit_date.desc())
                 .all()
             )
         else:
-            assurances = (
-                base_q
-                .filter_by(user_id=user_id)
-                .order_by(SafetyAssurance.audit_date.desc())
-                .all()
-            )
+            assurances = []
 
         latest = assurances[0] if assurances else None
         return render_template('safety_assurance.html', latest=latest, assurances=assurances)
