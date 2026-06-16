@@ -140,6 +140,15 @@
                   {% else %}
                     <span class="text-muted small">No File</span>
                   {% endif %}
+
+                  <a
+                    href="{{ url_for('send_audit_report', audit_id=record.id) }}"
+                    class="btn btn-sm btn-outline-secondary ms-1"
+                    title="Send Audit Report to Auditee"
+                    data-bs-toggle="tooltip"
+                  >
+                    <i class="bi bi-envelope-paper"></i>
+                  </a>
                 </td>
               </tr>
               {% endfor %}

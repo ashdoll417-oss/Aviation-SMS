@@ -816,6 +816,128 @@ def create_app(config_class=Config):
             download_name=record.audit_plan_filename or f'safety_assurance_plan_{record.id}'
         )
 
+    @app.route('/safety/assurance/send/<audit_id>', methods=['GET', 'POST'])
+    @login_required
+    @require_module('audits')
+    def send_audit_report(audit_id):
+        active_user = _safe_get_current_user()
+        tenant_id = getattr(active_user, 'tenant_id', None)
+
+        if not tenant_id:
+            flash("Audit record not found or unauthorized.", "danger")
+            return redirect(url_for('safety_assurance'))
+
+        # Securely look up the specific audit by tenant_id using a raw SQL text query
+        sql = text("SELECT * FROM safety_assurance WHERE id = :audit_id AND tenant_id = :tenant_id")
+        audit = db.session.execute(
+            sql, {"audit_id": audit_id, "tenant_id": str(tenant_id)}
+        ).mappings().first()
+
+        if not audit:
+            flash("Audit record not found or unauthorized.", "danger")
+            return redirect(url_for('safety_assurance'))
+
+        # Re-use our robust try/except mail execution block here to send the stylized corporate email layout
+        try:
+            auditee_email = audit.get('auditee_email')
+            if not auditee_email:
+                flash("Audit found, but no auditee email is set.", "warning")
+                return redirect(url_for('safety_assurance'))
+
+            audit_id_str = str(audit.get('id') or audit_id)
+
+            accept_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=accept&audit_id={audit_id_str}"
+            reschedule_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=reschedule&audit_id={audit_id_str}"
+
+            audit_scope = audit.get('audit_scope') or 'Maintenance Facilities'
+            target_month = audit.get('target_month') or 'Scheduled Month'
+            next_audit_date = audit.get('next_audit_date')
+            next_audit_date_str = next_audit_date.strftime('%m/%d/%Y') if hasattr(next_audit_date, 'strftime') else (str(next_audit_date) if next_audit_date else 'N/A')
+
+            notification_body = audit.get('notification_body') or 'Please review the audit schedule.'
+
+            msg = Message(
+                subject=f"Safety Audit Report Notification: {audit_scope}",
+                recipients=[auditee_email],
+            )
+
+            msg.html = f"""
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #1a1a1a; color: #ffffff; margin: 0; padding: 20px;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #2b2b2b; border: 1px solid #444; padding: 15px; text-align: center;">
+        <span style="font-size: 18px; font-weight: bold; color: #ffffff; letter-spacing: 1px;">INTERNAL AUDIT NOTIFICATION - AISL-SD-001</span><br>
+        <span style="font-size: 13px; color: #b3b3b3;">Aero Instrument Service Limited (AISL) | Workshop ID: K/AMO/L/016</span>
+    </div>
+    
+    <div style="max-width: 600px; margin: 0 auto; background-color: #242424; border-left: 1px solid #444; border-right: 1px solid #444; border-bottom: 1px solid #444; padding: 20px; color: #dddddd;">
+        <h4 style="color: #ffc107; border-bottom: 1px solid #444; padding-bottom: 5px; margin-top: 0;">AUDIT DETAILS</h4>
+        <table style="width: 100%; color: #dddddd; font-size: 14px; margin-bottom: 20px;">
+            <tr><td style="padding: 5px; width: 30%; font-weight: bold; color: #aaaaaa;">Audit Area:</td><td style="padding: 5px;">{audit_scope}</td></tr>
+            <tr><td style="padding: 5px; font-weight: bold; color: #aaaaaa;">Auditor:</td><td style="padding: 5px;">Head of Safety Office</td></tr>
+            <tr><td style="padding: 5px; font-weight: bold; color: #aaaaaa;">Schedule:</td><td style="padding: 5px;">{target_month}</td></tr>
+            <tr><td style="padding: 5px; font-weight: bold; color: #aaaaaa;">Next Audit:</td><td style="padding: 5px;">{next_audit_date_str}</td></tr>
+        </table>
+        
+        <p style="font-size: 14px; line-height: 1.5;">
+            <strong>Preparation Notice:</strong><br>
+            In accordance with <strong>AISL-005 (SMM)</strong>, please be advised of the scheduled audit. Preparation should follow the <strong>AISL-SD-002C</strong> checklist.
+        </p>
+        
+        <div style="background-color: #2d3748; border: 1px solid #4a5568; padding: 15px; text-align: center; margin-top: 25px; border-radius: 6px;">
+            <span style="font-size: 15px; font-weight: bold; color: #63b3ed;">📋 AUDIT SCHEDULE ACKNOWLEDGEMENT</span>
+            <p style="font-size: 13px; color: #cbd5e0; margin: 10px 0 15px 0;">Please confirm your acceptance of this audit schedule or request rescheduling:</p>
+            <a href="{accept_url}" style="background-color: #0056b3; color: white; padding: 10px 22px; text-decoration: none; font-weight: bold; border-radius: 4px; margin-right: 10px; display: inline-block; font-size: 13px;">✓ Accept Audit Schedule</a>
+            <a href="{reschedule_url}" style="background-color: #dc3545; color: white; padding: 10px 22px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block; font-size: 13px;">✗ Request Reschedule</a>
+            <br><span style="font-size: 11px; color: #a0aec0; display: inline-block; margin-top: 12px;">Audit ID: {audit_id_str}</span>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+            msg.body = (
+                f"{notification_body}\n\n"
+                f"Audit ID: {audit_id_str}\n"
+                f"Accept: {accept_url}\n"
+                f"Reschedule: {reschedule_url}\n"
+            )
+
+            # Optional: attach audit plan/checklist if present (best-effort; won't break redirect)
+            audit_plan_filename = audit.get('audit_plan_filename')
+            audit_plan_data = audit.get('audit_plan_data')
+            if audit_plan_data:
+                try:
+                    raw = base64.b64decode(audit_plan_data)
+                    msg.attach(
+                        filename=audit_plan_filename or f'safety_assurance_plan_{audit_id_str}',
+                        content_type=None,
+                        data=raw,
+                    )
+                except Exception:
+                    pass
+
+            checklist_name = audit.get('checklist_name')
+            checklist_data = audit.get('checklist_data')
+            if checklist_data:
+                try:
+                    raw = checklist_data if isinstance(checklist_data, (bytes, bytearray)) else base64.b64decode(checklist_data)
+                    msg.attach(
+                        filename=checklist_name or f'safety_assurance_checklist_{audit_id_str}',
+                        content_type=None,
+                        data=raw,
+                    )
+                except Exception:
+                    pass
+
+            mail.send(msg)
+
+            flash("Audit report successfully sent to the auditee!", "success")
+        except Exception as mail_err:
+            current_app.logger.error(f"Failed to dispatch audit report mail: {str(mail_err)}")
+            flash("Database updated, but there was a temporary notification delivery issue.", "warning")
+
+        return redirect(url_for('safety_assurance'))
+
     @app.route('/safety/assurance', methods=['POST'])
     @login_required
     @require_module('audits')
