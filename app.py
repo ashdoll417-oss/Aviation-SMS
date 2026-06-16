@@ -365,7 +365,10 @@ def create_app(config_class=Config):
         drills = SafetyDrill.query.all()
 
         if tenant_id:
-            assurances = SafetyAssurance.query.filter_by(tenant_id=tenant_id).all()
+            # Use raw SQL to avoid ORM namespace validation when columns are added out-of-band.
+            sql = text("SELECT * FROM safety_assurance WHERE tenant_id = :tenant_id")
+            rows = db.session.execute(sql, {"tenant_id": str(tenant_id)}).mappings().all()
+            assurances = rows
         else:
             assurances = []
 
@@ -774,13 +777,14 @@ def create_app(config_class=Config):
         active_user = _safe_get_current_user()
         tenant_id = getattr(active_user, 'tenant_id', None)
 
-        if tenant_id and hasattr(SafetyAssurance, 'tenant_id'):
-            assurances = (
-                SafetyAssurance.query
-                .filter_by(tenant_id=tenant_id, user_id=user_id)
-                .order_by(SafetyAssurance.audit_date.desc())
-                .all()
+        if tenant_id:
+            # Use raw SQL to avoid ORM namespace validation when columns are added out-of-band.
+            sql = text(
+                "SELECT * FROM safety_assurance WHERE tenant_id = :tenant_id AND user_id = :user_id ORDER BY audit_date DESC"
             )
+            assurances = db.session.execute(
+                sql, {"tenant_id": str(tenant_id), "user_id": user_id}
+            ).mappings().all()
         else:
             assurances = []
 
