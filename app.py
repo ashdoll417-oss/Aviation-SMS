@@ -769,26 +769,26 @@ def create_app(config_class=Config):
     @login_required
     @require_module('audits')
     def safety_assurance():
-        user_id = session.get('user_id')
-
         from sqlalchemy import text
+
+        user_id = session.get('user_id')
         active_user = _safe_get_current_user()
         tenant_id = str(getattr(active_user, 'tenant_id', None))
 
-        # Pull ALL relevant columns explicitly including our new public feedback metrics
         query = text("""
-            SELECT id, audit_date, target_month, audit_scope, status, 
+            SELECT id, audit_date, target_month, audit_scope, status,
                    auditee_responder_name, auditee_remarks, proposed_alternative_date,
                    next_audit_date, audit_plan_data
-            FROM safety_assurance 
+            FROM safety_assurance
             WHERE tenant_id = :tenant_id
+            AND user_id = :user_id
             ORDER BY audit_date DESC
         """)
 
-        if tenant_id and user_id:
-            records_result = db.session.execute(query, {"tenant_id": tenant_id}).mappings().all()
-        else:
-            records_result = []
+        records_result = db.session.execute(
+            query,
+            {"tenant_id": tenant_id, "user_id": user_id}
+        ).mappings().all()
 
         latest = records_result[0] if records_result else None
         assurances = records_result  # back-compat variable name
@@ -799,6 +799,33 @@ def create_app(config_class=Config):
             latest=latest,
             assurances=assurances
         )
+
+    @app.route('/safety/assurance/delete/<int:audit_id>', methods=['POST'])
+    @login_required
+    @require_module('audits')
+    def delete_safety_audit(audit_id):
+        from sqlalchemy import text
+
+        active_user = _safe_get_current_user()
+        tenant_id = str(getattr(active_user, 'tenant_id', None))
+
+        delete_sql = text("""
+            DELETE FROM safety_assurance
+            WHERE id = :audit_id AND tenant_id = :tenant_id
+        """)
+
+        result = db.session.execute(
+            delete_sql,
+            {"audit_id": audit_id, "tenant_id": tenant_id}
+        )
+        db.session.commit()
+
+        if getattr(result, "rowcount", 0) > 0:
+            flash("Audit record has been deleted successfully.", "success")
+        else:
+            flash("Unauthorized deletion request or record not found.", "danger")
+
+        return redirect(url_for('safety_assurance'))
 
     @app.route('/safety/download-plan/<int:record_id>')
     @login_required
