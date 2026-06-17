@@ -940,6 +940,45 @@ def create_app(config_class=Config):
 
         return redirect(url_for('safety_assurance'))
 
+    @app.route('/safety/assurance/respond/<audit_id>/<action>', methods=['GET'])
+    @login_required
+    def respond_to_audit_schedule(audit_id, action):
+        active_user = _safe_get_current_user()
+        tenant_id = getattr(active_user, 'tenant_id', None)
+
+        # 1. Securely fetch the specific record matching both target ID and tenant
+        sql = text("SELECT * FROM safety_assurance WHERE id = :audit_id AND tenant_id = :tenant_id")
+        audit = db.session.execute(
+            sql,
+            {"audit_id": audit_id, "tenant_id": str(tenant_id)}
+        ).mappings().first()
+
+        if not audit:
+            flash("Audit record not found or unauthorized.", "danger")
+            return redirect(url_for('safety_assurance'))
+
+        # 2. Process the action status switch
+        if action == 'accept':
+            update_sql = text(
+                "UPDATE safety_assurance SET status = 'Scheduled' WHERE id = :audit_id AND tenant_id = :tenant_id"
+            )
+            db.session.execute(update_sql, {"audit_id": audit_id, "tenant_id": str(tenant_id)})
+            db.session.commit()
+            flash(
+                f"Audit schedule for {audit.get('audit_scope')} has been successfully accepted and confirmed!",
+                "success"
+            )
+
+        elif action == 'reschedule':
+            update_sql = text(
+                "UPDATE safety_assurance SET status = 'Reschedule Requested' WHERE id = :audit_id AND tenant_id = :tenant_id"
+            )
+            db.session.execute(update_sql, {"audit_id": audit_id, "tenant_id": str(tenant_id)})
+            db.session.commit()
+            flash(f"Reschedule request for audit {audit.get('audit_scope')} has been logged.", "warning")
+
+        return redirect(url_for('safety_assurance'))
+
     @app.route('/safety/assurance', methods=['POST'])
     @login_required
     @require_module('audits')
