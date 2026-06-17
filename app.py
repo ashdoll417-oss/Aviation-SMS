@@ -1086,8 +1086,38 @@ def create_app(config_class=Config):
 
         # 2. DATE FIX & DATABASE SAVE FIRST (commit immediately BEFORE executing the email code)
         try:
-            db.session.add(assurance)
+            # --- START RAW SQL MULTI-TENANT INSERT PATCH ---
+            active_user = _safe_get_current_user()
+            tenant_id = str(getattr(active_user, 'tenant_id', None))
+
+            from sqlalchemy import text
+            insert_query = text("""
+                INSERT INTO safety_assurance (
+                    tenant_id, audit_date, target_month, audit_scope, status, 
+                    finding_details, auditee_email, email_body,
+                    auditee_responder_name, auditee_remarks, proposed_alternative_date
+                ) VALUES (
+                    :tenant_id, :audit_date, :target_month, :audit_scope, :status, 
+                    :finding_details, :auditee_email, :email_body,
+                    NULL, NULL, NULL
+                ) RETURNING id;
+            """)
+
+            result = db.session.execute(insert_query, {
+                "tenant_id": tenant_id,
+                "audit_date": request.form.get('audit_date'),
+                "target_month": request.form.get('target_month'),
+                "audit_scope": request.form.get('audit_scope'),
+                "status": request.form.get('status', 'Open'),
+                "finding_details": request.form.get('finding_details'),
+                "auditee_email": request.form.get('auditee_email'),
+                "email_body": request.form.get('email_body')
+            })
             db.session.commit()
+
+            # Define the exact variable string the down-stream mail generator relies on
+            audit_id_str = str(result.fetchone()[0])
+            # --- END RAW SQL MULTI-TENANT INSERT PATCH ---
         except Exception as e:
             db.session.rollback()
             print(f"DATABASE ERROR: {str(e)}")
