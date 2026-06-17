@@ -771,25 +771,34 @@ def create_app(config_class=Config):
     def safety_assurance():
         user_id = session.get('user_id')
 
-        # Force tenant isolation for brand-new orgs:
-        # - If tenant_id is missing/unassigned: return [] (no global fallback queries).
-        # - If tenant_id exists: filter strictly by tenant_id (and user_id for internal UI context).
+        from sqlalchemy import text
         active_user = _safe_get_current_user()
-        tenant_id = getattr(active_user, 'tenant_id', None)
+        tenant_id = str(getattr(active_user, 'tenant_id', None))
 
-        if tenant_id:
-            # Use raw SQL to avoid ORM namespace validation when columns are added out-of-band.
-            sql = text(
-                "SELECT * FROM safety_assurance WHERE tenant_id = :tenant_id AND user_id = :user_id ORDER BY audit_date DESC"
-            )
-            assurances = db.session.execute(
-                sql, {"tenant_id": str(tenant_id), "user_id": user_id}
-            ).mappings().all()
+        # Pull ALL relevant columns explicitly including our new public feedback metrics
+        query = text("""
+            SELECT id, audit_date, target_month, audit_scope, status, 
+                   auditee_responder_name, auditee_remarks, proposed_alternative_date,
+                   next_audit_date, audit_plan_data
+            FROM safety_assurance 
+            WHERE tenant_id = :tenant_id
+            ORDER BY audit_date DESC
+        """)
+
+        if tenant_id and user_id:
+            records_result = db.session.execute(query, {"tenant_id": tenant_id}).mappings().all()
         else:
-            assurances = []
+            records_result = []
 
-        latest = assurances[0] if assurances else None
-        return render_template('safety_assurance.html', latest=latest, assurances=assurances)
+        latest = records_result[0] if records_result else None
+        assurances = records_result  # back-compat variable name
+
+        return render_template(
+            'safety_assurance.html',
+            records=records_result,
+            latest=latest,
+            assurances=assurances
+        )
 
     @app.route('/safety/download-plan/<int:record_id>')
     @login_required
