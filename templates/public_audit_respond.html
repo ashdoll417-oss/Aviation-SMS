@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Safety Audit Response</title>
+
+  <!-- Bootstrap 5 (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --brand-900:#071a3a;
+      --brand-800:#0b2a66;
+      --brand-600:#0d5bd6;
+      --brand-100:#e9f2ff;
+    }
+    body{
+      background:
+        radial-gradient(1100px 550px at 15% 10%, rgba(13,91,214,.25), transparent 55%),
+        radial-gradient(900px 500px at 85% 20%, rgba(11,42,102,.22), transparent 50%),
+        linear-gradient(180deg, #06122a 0%, #070a13 100%);
+      color: #eaf2ff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 28px 0;
+    }
+    .brand-card{
+      background: linear-gradient(180deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.04) 100%);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      box-shadow: 0 18px 45px rgba(0,0,0,.35);
+      overflow: hidden;
+    }
+    .brand-header{
+      background: linear-gradient(90deg, rgba(13,91,214,.35) 0%, rgba(11,42,102,.15) 70%, rgba(255,255,255,.06) 100%);
+      border-bottom: 1px solid rgba(255,255,255,.10);
+    }
+    .badge-soft{
+      background: rgba(13,91,214,.18);
+      border: 1px solid rgba(13,91,214,.35);
+      color: #d7e7ff;
+      font-weight: 600;
+    }
+    .form-control, .form-select{
+      background: rgba(0,0,0,.20);
+      border: 1px solid rgba(255,255,255,.18);
+      color: #eaf2ff;
+    }
+    .form-control::placeholder{ color: rgba(234,242,255,.55); }
+    .form-control:focus, .form-select:focus{
+      background: rgba(0,0,0,.22);
+      border-color: rgba(13,91,214,.65);
+      box-shadow: 0 0 0 .25rem rgba(13,91,214,.25);
+      color: #fff;
+    }
+    .btn-brand{
+      background: linear-gradient(180deg, rgba(13,91,214,1) 0%, rgba(10,73,170,1) 100%);
+      border: 0;
+      color: #fff;
+      font-weight: 700;
+      padding: 12px 18px;
+      border-radius: 12px;
+    }
+    .btn-brand:hover{
+      filter: brightness(1.05);
+      color: #fff;
+    }
+    .muted-hr{
+      border-color: rgba(255,255,255,.12);
+    }
+    .help-text{
+      color: rgba(234,242,255,.75);
+    }
+    .readonly-field{
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 12px;
+      padding: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container" style="max-width: 920px;">
+    <div class="brand-card">
+      <div class="brand-header py-3 px-4">
+        <div class="d-flex align-items-center justify-content-between gap-3">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge badge-soft">Public Response</span>
+              <span class="text-white-50 small">AISL-SD-001</span>
+            </div>
+            <h3 class="m-0 mt-2">Safety Audit Schedule Response</h3>
+          </div>
+          <div class="text-end">
+            <div class="small help-text">Head of Safety Office</div>
+            <div class="small help-text">Auditee Confirmation Portal</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 p-md-5">
+        <div class="row g-4">
+          <div class="col-12">
+            <div class="readonly-field">
+              <div class="row g-3 align-items-start">
+                <div class="col-md-6">
+                  <div class="small help-text mb-1">Audit Scope</div>
+                  <div class="fs-5 fw-semibold">
+                    {{ audit.get('audit_scope') if audit is mapping else audit['audit_scope'] if audit is not none else 'N/A' }}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="small help-text mb-1">Proposed Date</div>
+                  <div class="fs-5 fw-semibold">
+                    {% set proposed = audit.get('next_audit_date') if audit is mapping else (audit['next_audit_date'] if audit is not none else none) %}
+                    {{ proposed.strftime('%m/%d/%Y') if proposed and proposed.strftime else (proposed or 'N/A') }}
+                  </div>
+                </div>
+              </div>
+              <hr class="muted-hr my-4"/>
+              <div class="small help-text">
+                Please confirm your acceptance of this schedule or request rescheduling. Your response is securely stored.
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <form method="POST" action="" class="needs-validation" novalidate>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="responder_name">Your Full Name <span class="text-danger">*</span></label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="responder_name"
+                    name="responder_name"
+                    placeholder="e.g., John A. Doe"
+                    required
+                  />
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label" for="alternative_date">Provide your Preferred Alternative Date</label>
+                  {% if action == 'reschedule' %}
+                    <input
+                      type="date"
+                      class="form-control"
+                      id="alternative_date"
+                      name="alternative_date"
+                      required
+                    />
+                    <div class="form-text help-text">Required when requesting rescheduling.</div>
+                  {% else %}
+                    <input
+                      type="date"
+                      class="form-control"
+                      id="alternative_date"
+                      name="alternative_date"
+                      disabled
+                      placeholder="N/A"
+                    />
+                    <div class="form-text help-text">Alternative date is only needed for reschedule requests.</div>
+                  {% endif %}
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label" for="remarks">Remarks/Comments <span class="text-muted">(Optional)</span></label>
+                  <textarea
+                    class="form-control"
+                    id="remarks"
+                    name="remarks"
+                    rows="4"
+                    placeholder="Add any comments relevant to your acceptance or rescheduling request..."></textarea>
+                </div>
+
+                <div class="col-12 d-flex align-items-center justify-content-end gap-3">
+                  <div class="text-end">
+                    <div class="help-text small">Action: <span class="fw-semibold text-white">{{ 'Accept' if action == 'accept' else 'Reschedule' }}</span></div>
+                  </div>
+                  <button type="submit" class="btn btn-brand px-4">
+                    Submit Audit Response
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div class="col-12">
+            <div class="alert alert-info mb-0" style="background: rgba(13,91,214,.15); border-color: rgba(13,91,214,.35); color: #d7e7ff;">
+              <strong>Note:</strong> Do not refresh after submitting. If the invitation link is expired or invalid, you may see an error.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center mt-3 small help-text">
+      For internal use only. External auditee links are unauthenticated by design.
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const form = document.querySelector('form');
+      if (!form) return;
+      form.addEventListener('submit', function(){
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+      });
+    })();
+  </script>
+</body>
+</html>

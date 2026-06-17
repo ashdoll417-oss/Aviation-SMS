@@ -115,6 +115,8 @@
               <th>Audit Scope</th>
               <th>Target Month</th>
               <th>Status</th>
+              <th>Auditee Responder</th>
+              <th>Auditee Remarks</th>
               <th>Next Audit</th>
               <th class="text-end">Actions</th>
             </tr>
@@ -129,6 +131,12 @@
                 <td>
                   <span class="badge {% if record['status'] == 'Closed' %}text-bg-success{% else %}text-bg-warning{% endif %}">
                     {{ record['status'] }}
+                  </span>
+                </td>
+                <td>{{ record['auditee_responder_name'] or 'N/A' }}</td>
+                <td>
+                  <span class="text-truncate d-inline-block" style="max-width: 260px;" title="{{ record['auditee_remarks'] or '' }}">
+                    {{ record['auditee_remarks'] or 'N/A' }}
                   </span>
                 </td>
                 <td>{{ record['next_audit_date'].strftime('%m/%d/%Y') if record['next_audit_date'] else 'N/A' }}</td>
@@ -154,7 +162,7 @@
               {% endfor %}
             {% else %}
               <tr>
-                <td colspan="6" class="text-center py-4 text-muted">No audit records found.</td>
+                <td colspan="8" class="text-center py-4 text-muted">No audit records found.</td>
               </tr>
             {% endif %}
           </tbody>

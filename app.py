@@ -940,44 +940,46 @@ def create_app(config_class=Config):
 
         return redirect(url_for('safety_assurance'))
 
-    @app.route('/safety/assurance/respond/<audit_id>/<action>', methods=['GET'])
-    @login_required
+    @app.route('/safety/assurance/respond/<audit_id>/<action>', methods=['GET', 'POST'])
     def respond_to_audit_schedule(audit_id, action):
-        active_user = _safe_get_current_user()
-        tenant_id = getattr(active_user, 'tenant_id', None)
+        from sqlalchemy import text
 
-        # 1. Securely fetch the specific record matching both target ID and tenant
-        sql = text("SELECT * FROM safety_assurance WHERE id = :audit_id AND tenant_id = :tenant_id")
-        audit = db.session.execute(
-            sql,
-            {"audit_id": audit_id, "tenant_id": str(tenant_id)}
-        ).mappings().first()
+        # Securely look up the audit purely by its unique ID (no tenant check here since they are unauthenticated public users)
+        sql = text("SELECT * FROM safety_assurance WHERE id = :audit_id")
+        audit = db.session.execute(sql, {"audit_id": audit_id}).mappings().first()
 
         if not audit:
-            flash("Audit record not found or unauthorized.", "danger")
-            return redirect(url_for('safety_assurance'))
+            return "<h3>Invalid or expired audit invitation link.</h3>", 404
 
-        # 2. Process the action status switch
-        if action == 'accept':
-            update_sql = text(
-                "UPDATE safety_assurance SET status = 'Scheduled' WHERE id = :audit_id AND tenant_id = :tenant_id"
-            )
-            db.session.execute(update_sql, {"audit_id": audit_id, "tenant_id": str(tenant_id)})
+        if request.method == 'POST':
+            responder_name = request.form.get('responder_name')
+            remarks = request.form.get('remarks')
+            alt_date = request.form.get('alternative_date') or None
+
+            # Determine status based on action click
+            new_status = 'Scheduled' if action == 'accept' else 'Reschedule Requested'
+
+            update_sql = text("""
+                UPDATE safety_assurance 
+                SET status = :status,
+                    auditee_responder_name = :name,
+                    auditee_remarks = :remarks,
+                    proposed_alternative_date = :alt_date
+                WHERE id = :audit_id
+            """)
+            db.session.execute(update_sql, {
+                "status": new_status,
+                "name": responder_name,
+                "remarks": remarks,
+                "alt_date": alt_date,
+                "audit_id": audit_id
+            })
             db.session.commit()
-            flash(
-                f"Audit schedule for {audit.get('audit_scope')} has been successfully accepted and confirmed!",
-                "success"
-            )
 
-        elif action == 'reschedule':
-            update_sql = text(
-                "UPDATE safety_assurance SET status = 'Reschedule Requested' WHERE id = :audit_id AND tenant_id = :tenant_id"
-            )
-            db.session.execute(update_sql, {"audit_id": audit_id, "tenant_id": str(tenant_id)})
-            db.session.commit()
-            flash(f"Reschedule request for audit {audit.get('audit_scope')} has been logged.", "warning")
+            return render_template('public_audit_success.html', audit=audit, action=action)
 
-        return redirect(url_for('safety_assurance'))
+        # GET request shows the input form
+        return render_template('public_audit_respond.html', audit=audit, action=action)
 
     @app.route('/safety/assurance', methods=['POST'])
     @login_required
