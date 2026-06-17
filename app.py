@@ -846,8 +846,10 @@ def create_app(config_class=Config):
 
             audit_id_str = str(audit.get('id') or audit_id)
 
-            accept_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=accept&audit_id={audit_id_str}"
-            reschedule_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=reschedule&audit_id={audit_id_str}"
+            base_url = request.host_url.rstrip('/')
+
+            accept_url = f"{base_url}/safety/assurance/respond/{audit_id}/accept"
+            reschedule_url = f"{base_url}/safety/assurance/respond/{audit_id}/reschedule"
 
             audit_scope = audit.get('audit_scope') or 'Maintenance Facilities'
             target_month = audit.get('target_month') or 'Scheduled Month'
@@ -1061,8 +1063,12 @@ def create_app(config_class=Config):
                 )
 
                 audit_id_str = str(assurance.id) if assurance.id else "PENDING"
-                accept_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=accept&audit_id={audit_id_str}"
-                reschedule_url = f"https://aviation-sms-erp.vercel.app/safety/assurance/respond?action=reschedule&audit_id={audit_id_str}"
+                record_id = audit_id_str
+
+                base_url = request.host_url.rstrip('/')
+
+                accept_url = f"{base_url}/safety/assurance/respond/{audit_id if 'audit_id' in locals() else record_id}/accept"
+                reschedule_url = f"{base_url}/safety/assurance/respond/{audit_id if 'audit_id' in locals() else record_id}/reschedule"
 
                 msg.html = f"""
 <html>
