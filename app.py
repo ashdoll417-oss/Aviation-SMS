@@ -827,6 +827,110 @@ def create_app(config_class=Config):
 
         return redirect(url_for('safety_assurance'))
 
+    @app.route('/safety/assurance/report/<int:audit_id>', methods=['GET'])
+    @login_required
+    @require_module('audits')
+    def download_audit_report_doc(audit_id):
+        import io
+        from docx import Document
+        from docx.shared import Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from sqlalchemy import text
+        
+        # 1. Capture active user and tenant identity
+        active_user = _safe_get_current_user()
+        tenant_id = str(getattr(active_user, 'tenant_id', None))
+        
+        # 2. Query target safety assurance record matching columns
+        query = text("""
+            SELECT id, audit_date, target_month, audit_scope, status, 
+                   auditee_responder_name, auditee_remarks, finding_details, auditee_email
+            FROM safety_assurance 
+            WHERE id = :audit_id AND tenant_id = :tenant_id
+        """)
+        record = db.session.execute(query, {"audit_id": audit_id, "tenant_id": tenant_id}).mappings().first()
+        
+        if not record:
+            flash("Audit record not found or access denied.", "danger")
+            return redirect(url_for('safety_assurance'))
+            
+        # 3. Create document workspace in-memory
+        doc = Document()
+        style = doc.styles['Normal']
+        style.font.name = 'Arial'
+        style.font.size = Pt(11)
+        
+        # Header title rendering
+        title = doc.add_paragraph()
+        title_run = title.add_run(f"INTERNAL SAFETY AUDIT REPORT — {record['audit_scope']}")
+        title_run.bold = True
+        title_run.font.size = Pt(14)
+        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Meta grid metrics table block
+        doc.add_paragraph("\n1. AUDIT OVERVIEW & METRICS").runs[0].bold = True
+        table = doc.add_table(rows=4, cols=2)
+        table.style = 'Table Grid'
+        
+        hdr_cells_0 = table.rows[0].cells
+        hdr_cells_0[0].text = f"Audit Date: {record['audit_date'] or 'N/A'}"
+        hdr_cells_0[1].text = f"Target Window: {record['target_month'] or 'N/A'}"
+        
+        hdr_cells_1 = table.rows[1].cells
+        hdr_cells_1[0].text = f"Audit Scope/Area: {record['audit_scope'] or 'N/A'}"
+        hdr_cells_1[1].text = f"Auditee Point of Contact: {record['auditee_email'] or 'N/A'}"
+        
+        hdr_cells_2 = table.rows[2].cells
+        hdr_cells_2[0].text = f"Current Status Badge: {record['status'] or 'Open'}"
+        hdr_cells_2[1].text = f"Verified Action Responder: {record['auditee_responder_name'] or 'Pending Response'}"
+        
+        hdr_cells_3 = table.rows[3].cells
+        hdr_cells_3[0].text = "Number of Raised Findings: 1" if record['finding_details'] else "Number of Raised Findings: 0"
+        hdr_cells_3[1].text = f"Tracking ID: SMS/ASR/{record['id']}"
+        
+        # Technical context sections block parsing
+        doc.add_paragraph("\n2. EXECUTIVE INTRODUCTION").runs[0].bold = True
+        doc.add_paragraph(
+            f"This internal safety surveillance inspection was dynamically processed for scope framework area [{record['audit_scope']}] "
+            f"corresponding to schedule target cycle {record['target_month']}. This tracking document summarizes the current performance observations, "
+            f"raised non-conformities, and responses compiled down to this date."
+        )
+        
+        doc.add_paragraph("\n3. GENERAL COMMENTS & OBSERVATIONS").runs[0].bold = True
+        doc.add_paragraph(
+            "Operations and maintenance infrastructure areas conform with relevant system safety regulations. "
+            "Workshop workspace safety margins remain supported with an emphasis on keeping team personnel protected from operational industrial hazards."
+        )
+        
+        doc.add_paragraph("\n4. DETAILS OF RAISED NON-CONFORMITIES & REMARKS").runs[0].bold = True
+        if record['finding_details']:
+            doc.add_paragraph(f"The following discrepancy was identified during review:\n{record['finding_details']}")
+        else:
+            doc.add_paragraph("No system deviations or immediate action items were noted during this check phase.")
+            
+        if record['auditee_remarks']:
+            doc.add_paragraph(f"\nAuditee Logged Feedback/Remarks:\n\"{record['auditee_remarks']}\"")
+            
+        doc.add_paragraph("\n\n5. AUTHORIZATION & SIGNATURE MATRIX").runs[0].bold = True
+        p_sig = doc.add_paragraph()
+        p_sig.add_run("Auditor Signature / Date: ___________________        ").bold = True
+        p_sig.add_run("Auditee Signature / Date: ___________________").bold = True
+        
+        # Stream file artifact byte buffer factory
+        target_stream = io.BytesIO()
+        doc.save(target_stream)
+        target_stream.seek(0)
+        
+        clean_filename = f"Audit_Report_ID_{record['id']}_{record['audit_scope']}.docx".replace(" ", "_")
+        
+        from flask import send_file
+        return send_file(
+            target_stream,
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            as_attachment=True,
+            download_name=clean_filename
+        )
+
     @app.route('/safety/download-plan/<int:record_id>')
     @login_required
     def download_plan(record_id: int):
