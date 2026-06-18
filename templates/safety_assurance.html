@@ -115,9 +115,10 @@
               <th>Audit Scope</th>
               <th>Target Month</th>
               <th>Status</th>
-              <th>Auditee Responder</th>
-              <th>Auditee Remarks</th>
-              <th>Next Audit</th>
+              <th>Auditee Responder &amp; Sign-Off</th>
+              <th>Root Cause Analysis</th>
+              <th>Corrective Actions &amp; Alterations</th>
+              <th>Next Audit Due</th>
               <th class="text-end">Actions</th>
             </tr>
           </thead>
@@ -129,17 +130,42 @@
                 <td><strong>{{ record['audit_scope'] or 'N/A' }}</strong></td>
                 <td>{{ record['target_month'] or 'N/A' }}</td>
                 <td>
-                  <span class="badge {% if record['status'] == 'Closed' %}text-bg-success{% else %}text-bg-warning{% endif %}">
-                    {{ record['status'] }}
-                  </span>
+                  {% if record['status'] == 'Closed' %}
+                      <span class="badge text-bg-success">Closed</span>
+                  {% else %}
+                      <span class="badge text-bg-warning text-dark">Open</span>
+                  {% endif %}
                 </td>
-                <td>{{ record['auditee_responder_name'] or 'N/A' }}</td>
                 <td>
-                  <span class="text-truncate d-inline-block" style="max-width: 260px;" title="{{ record['auditee_remarks'] or '' }}">
-                    {{ record['auditee_remarks'] or 'N/A' }}
-                  </span>
+                  {% if record['auditee_signature_name'] %}
+                      <strong>{{ record['auditee_signature_name'] }}</strong><br>
+                      <small class="text-muted">Signed: {{ record['auditee_signed_date'] or 'N/A' }}</small>
+                  {% else %}
+                      <span class="text-muted">Pending Response</span>
+                  {% endif %}
                 </td>
-                <td>{{ record['next_audit_date'].strftime('%m/%d/%Y') if record['next_audit_date'] else 'N/A' }}</td>
+                <td>
+                  {% if record['root_causes'] %}
+                      <div style="max-width: 200px; font-size: 0.85rem;" class="text-truncate" title="{{ record['root_causes'] }}">
+                          {{ record['root_causes'] }}
+                      </div>
+                  {% else %}
+                      <span class="text-muted">--</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if record['immediate_corrective_action'] %}
+                      <div style="max-width: 250px; font-size: 0.85rem;">
+                          <strong>ICA:</strong> {{ record['immediate_corrective_action'] }}<br>
+                          {% if record['system_alteration'] %}
+                              <strong>System Alt:</strong> {{ record['system_alteration'] }}
+                          {% endif %}
+                      </div>
+                  {% else %}
+                      <span class="text-muted">--</span>
+                  {% endif %}
+                </td>
+                <td>{{ record['next_audit'] or 'N/A' }}</td>
                 <td class="text-end">
                   {% if record['audit_plan_data'] %}
                     <a href="{{ url_for('download_plan', record_id=record['id']) }}" class="btn btn-sm btn-outline-primary">
@@ -208,7 +234,7 @@
               {% endfor %}
             {% else %}
               <tr>
-                <td colspan="8" class="text-center py-4 text-muted">No audit records found.</td>
+                <td colspan="9" class="text-center py-4 text-muted">No audit records found.</td>
               </tr>
             {% endif %}
           </tbody>
