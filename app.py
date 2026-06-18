@@ -771,18 +771,20 @@ def create_app(config_class=Config):
     def safety_assurance():
         from sqlalchemy import text
 
+        # 1. Capture current active tenant context cleanly
         active_user = _safe_get_current_user()
         tenant_id = str(getattr(active_user, 'tenant_id', None))
 
+        # 2. Execute explicit query using strictly tenant_id constraint
         query = text("""
-            SELECT id,
-                   audit_date,
-                   target_month,
-                   audit_scope,
-                   status,
+            SELECT id, 
+                   audit_date, 
+                   target_month, 
+                   audit_scope, 
+                   status, 
                    finding_details,
                    auditee_email,
-                   auditee_responder_name,
+                   auditee_responder_name, 
                    auditee_remarks,
                    description_of_conformance,
                    root_causes,
@@ -791,15 +793,16 @@ def create_app(config_class=Config):
                    auditee_signature_name,
                    auditee_signed_date,
                    next_audit
-            FROM safety_assurance
+            FROM safety_assurance 
             WHERE tenant_id = :tenant_id
             ORDER BY audit_date DESC
         """)
-
-        records_result = db.session.execute(
-            query,
-            {"tenant_id": tenant_id}
-        ).mappings().all()
+        
+        try:
+            records_result = db.session.execute(query, {"tenant_id": tenant_id}).mappings().all()
+        except Exception as e:
+            print(f"Database fetch breakdown log: {str(e)}")
+            records_result = []
 
         latest = records_result[0] if records_result else None
         assurances = records_result  # back-compat variable name
