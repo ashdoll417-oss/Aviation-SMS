@@ -1001,10 +1001,20 @@ def create_app(config_class=Config):
             
             clean_filename = f"Audit_Report_ID_{record['id']}_{record['audit_scope']}.docx".replace(" ", "_")
             
+            response_link = f"https://aviation-sms.vercel.app/public/safety/respond/{record['id']}"
+
             msg = Message(
                 subject=f"Action Required: Internal Safety Audit Report - {record['audit_scope']}",
                 recipients=[recipient_email],
-                body=f"Dear Team,\n\nPlease find attached the formal Internal Safety Audit Report regarding the recent {record['audit_scope']} workshop evaluation.\n\nKindly review the listed discrepancies and submit your operational corrective action plans directly back through your workspace tracking portal tracking links.\n\nBest Regards,\nHead of Safety Office"
+                body=(
+                    "Dear Team,\n\n"
+                    f"Please find attached the formal Internal Safety Audit Report regarding the recent {record['audit_scope']} evaluation.\n\n"
+                    "CRITICAL ACTION REQUIRED:\n"
+                    "Kindly use the secure link below to log your formal root cause analysis, immediate corrective actions, and digital signature to close out these findings:\n"
+                    f"👉 {response_link}\n\n"
+                    "Best Regards,\n"
+                    "Head of Safety Office"
+                )
             )
             
             msg.attach(
@@ -1170,6 +1180,64 @@ def create_app(config_class=Config):
             flash("Database updated, but there was a temporary notification delivery issue.", "warning")
 
         return redirect(url_for('safety_assurance'))
+
+    @app.route('/public/safety/respond/<int:audit_id>', methods=['GET', 'POST'])
+    def public_audit_response_portal(audit_id):
+        from sqlalchemy import text
+        from flask import request, render_template, flash, redirect, url_for
+        import datetime
+
+        if request.method == 'POST':
+            conformance = request.form.get('description_of_conformance', '').strip()
+            root_causes = request.form.get('root_causes', '').strip()
+            corr_action = request.form.get('immediate_corrective_action', '').strip()
+            sys_alteration = request.form.get('system_alteration', '').strip()
+            sig_name = request.form.get('auditee_signature_name', '').strip()
+            sig_date_in = request.form.get('auditee_signed_date', '').strip()
+
+            # Allow DATE/VARCHAR column types; store as ISO date if possible, else store provided string.
+            if sig_date_in:
+                sig_date = sig_date_in
+            else:
+                sig_date = datetime.date.today().isoformat()
+
+            try:
+                update_sql = text("""
+                    UPDATE safety_assurance 
+                    SET description_of_conformance = :conformance,
+                        root_causes = :root_causes,
+                        immediate_corrective_action = :corr_action,
+                        system_alteration = :sys_alteration,
+                        auditee_signature_name = :sig_name,
+                        auditee_signed_date = :sig_date,
+                        auditee_responder_name = :sig_name,
+                        auditee_remarks = :corr_action,
+                        status = 'Closed'
+                    WHERE id = :audit_id
+                """)
+                db.session.execute(update_sql, {
+                    "conformance": conformance,
+                    "root_causes": root_causes,
+                    "corr_action": corr_action,
+                    "sys_alteration": sys_alteration,
+                    "sig_name": sig_name,
+                    "sig_date": sig_date,
+                    "audit_id": audit_id
+                })
+                db.session.commit()
+                return render_template('public_audit_success.html')
+
+            except Exception as e:
+                db.session.rollback()
+                flash(f"Error submitting corrective actions: {str(e)}", "danger")
+
+        # GET Request: Fetch info for the public landing view frame
+        query = text("SELECT id, audit_scope, audit_date, finding_details FROM safety_assurance WHERE id = :audit_id")
+        record = db.session.execute(query, {"audit_id": audit_id}).mappings().first()
+        if not record:
+            return "Audit record link invalid or expired.", 404
+
+        return render_template('public_audit_response.html', record=record)
 
     @app.route('/safety/assurance/respond/<audit_id>/<action>', methods=['GET', 'POST'])
     def respond_to_audit_schedule(audit_id, action):

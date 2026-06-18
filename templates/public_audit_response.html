@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Safety Audit Closure Response</title>
+
+  <!-- Bootstrap 5 (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --brand-950:#06122a;
+      --brand-900:#071a3a;
+      --brand-800:#0b2a66;
+      --brand-600:#0d5bd6;
+      --brand-100:#e9f2ff;
+
+      --card-bg: rgba(255,255,255,.06);
+      --card-border: rgba(255,255,255,.14);
+      --field-bg: rgba(0,0,0,.22);
+      --field-border: rgba(255,255,255,.18);
+    }
+
+    body{
+      background:
+        radial-gradient(1100px 550px at 15% 10%, rgba(13,91,214,.25), transparent 55%),
+        radial-gradient(900px 500px at 85% 20%, rgba(11,42,102,.22), transparent 50%),
+        linear-gradient(180deg, #06122a 0%, #070a13 100%);
+      color: #eaf2ff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 28px 0;
+    }
+
+    .card-wrap{
+      width: 100%;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    .brand-card{
+      background: linear-gradient(180deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.04) 100%);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      box-shadow: 0 18px 45px rgba(0,0,0,.35);
+      overflow: hidden;
+    }
+
+    .brand-header{
+      background: linear-gradient(90deg, rgba(13,91,214,.35) 0%, rgba(11,42,102,.15) 70%, rgba(255,255,255,.06) 100%);
+      border-bottom: 1px solid rgba(255,255,255,.10);
+    }
+
+    .badge-soft{
+      background: rgba(13,91,214,.18);
+      border: 1px solid rgba(13,91,214,.35);
+      color: #d7e7ff;
+      font-weight: 700;
+    }
+
+    .help-text{
+      color: rgba(234,242,255,.75);
+    }
+
+    .warning-card{
+      background: rgba(220, 53, 69, .14);
+      border: 1px solid rgba(220, 53, 69, .35);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .form-control, .form-select, textarea{
+      background: rgba(0,0,0,.20);
+      border: 1px solid rgba(255,255,255,.18);
+      color: #eaf2ff;
+    }
+
+    .form-control::placeholder{ color: rgba(234,242,255,.55); }
+
+    .form-control:focus, .form-select:focus, textarea:focus{
+      background: rgba(0,0,0,.22);
+      border-color: rgba(13,91,214,.65);
+      box-shadow: 0 0 0 .25rem rgba(13,91,214,.25);
+      color: #fff;
+    }
+
+    .btn-brand{
+      background: linear-gradient(180deg, rgba(13,91,214,1) 0%, rgba(10,73,170,1) 100%);
+      border: 0;
+      color: #fff;
+      font-weight: 800;
+      padding: 12px 18px;
+      border-radius: 12px;
+    }
+    .btn-brand:hover{ filter: brightness(1.05); color: #fff; }
+
+    .readonly-field{
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    textarea.form-control{
+      min-height: 120px;
+      resize: vertical;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container card-wrap">
+    <div class="brand-card">
+      <div class="brand-header py-3 px-4">
+        <div class="d-flex align-items-start justify-content-between gap-3">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge badge-soft">Auditee Action & Closure</span>
+              <span class="text-white-50 small">AISL-SD-011</span>
+            </div>
+            <h3 class="m-0 mt-2">Formal Corrective Actions Submission</h3>
+            <div class="help-text small mt-1">Unauthenticated portal response (secure-by-link)</div>
+          </div>
+          <div class="text-end">
+            <div class="small help-text">Head of Safety Office</div>
+            <div class="small help-text">Auditee Portal</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 p-md-5">
+        <!-- Read-only warning card -->
+        <div class="warning-card mb-4">
+          <div class="d-flex align-items-start gap-3">
+            <div class="mt-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <div>
+              <div class="fw-bold mb-1">Read Carefully Before Submitting</div>
+              <div class="help-text">
+                You are closing findings for the following audit scope. Ensure your responses accurately describe the conformance and closure actions.
+              </div>
+
+              <hr style="border-color: rgba(255,255,255,.18);" class="my-3" />
+
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <div class="small help-text mb-1">Audit Scope</div>
+                  <div class="fs-5 fw-semibold">
+                    {{ record['audit_scope'] if record is mapping else record.audit_scope if record is not none else 'N/A' }}
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small help-text mb-1">Raised Finding Details</div>
+                  <div class="fs-6 fw-semibold" style="word-break: break-word;">
+                    {{ (record['finding_details'] if record is mapping else record.finding_details) or 'N/A' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <form method="POST" action="" class="needs-validation" novalidate>
+          <div class="row g-4">
+            <div class="col-12">
+              <label class="form-label" for="description_of_conformance">
+                Description of Conformance <span class="text-danger">*</span>
+              </label>
+              <textarea
+                class="form-control"
+                id="description_of_conformance"
+                name="description_of_conformance"
+                required
+                placeholder="Describe how the non-conformance was addressed and why it is now in conformance."></textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="root_causes">
+                Root Causes <span class="text-danger">*</span>
+              </label>
+              <textarea
+                class="form-control"
+                id="root_causes"
+                name="root_causes"
+                required
+                placeholder="List and justify the root causes that led to the finding(s)."></textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="immediate_corrective_action">
+                Immediate Corrective Action <span class="text-danger">*</span>
+              </label>
+              <textarea
+                class="form-control"
+                id="immediate_corrective_action"
+                name="immediate_corrective_action"
+                required
+                placeholder="What was done immediately to control the non-conformance and prevent recurrence in the short term?"></textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="system_alteration">
+                System Alteration <span class="text-danger">*</span>
+              </label>
+              <textarea
+                class="form-control"
+                id="system_alteration"
+                name="system_alteration"
+                required
+                placeholder="Describe the system/process changes implemented to ensure long-term corrective closure."></textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="auditee_signature_name">
+                Digital Signature Authorization (Auditee Name) <span class="text-danger">*</span>
+              </label>
+              <input
+                type="text"
+                class="form-control"
+                id="auditee_signature_name"
+                name="auditee_signature_name"
+                required
+                placeholder="Enter your full name as it should appear for the auditee signature."
+              />
+            </div>
+
+            <!-- Optional: the backend will default to today if omitted -->
+            <input type="hidden" name="auditee_signed_date" value="" />
+
+            <div class="col-12 d-flex align-items-center justify-content-end gap-3">
+              <button type="submit" class="btn btn-brand px-4">
+                Submit & Close Findings
+              </button>
+            </div>
+
+            <div class="col-12">
+              <div class="alert alert-info mb-0" style="background: rgba(13,91,214,.15); border-color: rgba(13,91,214,.35); color: #d7e7ff;">
+                <strong>Note:</strong> Do not refresh after submitting. If the link expires or is invalid, you may see an error.
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="text-center mt-3 small help-text">
+      External response links are unauthenticated by design.
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const form = document.querySelector('form');
+      if (!form) return;
+
+      const dateInput = document.querySelector('input[name="auditee_signed_date"]');
+      if (dateInput && !dateInput.value) {
+        // Leave empty so backend will default to server date; but we can prefill safely:
+        try {
+          const d = new Date();
+          const iso = d.toISOString().slice(0, 10);
+          dateInput.value = iso;
+        } catch (e) {}
+      }
+
+      form.addEventListener('submit', function(){
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+      });
+    })();
+  </script>
+</body>
+</html>
