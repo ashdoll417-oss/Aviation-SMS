@@ -771,23 +771,34 @@ def create_app(config_class=Config):
     def safety_assurance():
         from sqlalchemy import text
 
-        user_id = session.get('user_id')
         active_user = _safe_get_current_user()
         tenant_id = str(getattr(active_user, 'tenant_id', None))
 
         query = text("""
-            SELECT id, audit_date, target_month, audit_scope, status,
-                   auditee_responder_name, auditee_remarks, proposed_alternative_date,
-                   next_audit_date, audit_plan_data
+            SELECT id,
+                   audit_date,
+                   target_month,
+                   audit_scope,
+                   status,
+                   finding_details,
+                   auditee_email,
+                   auditee_responder_name,
+                   auditee_remarks,
+                   description_of_conformance,
+                   root_causes,
+                   immediate_corrective_action,
+                   system_alteration,
+                   auditee_signature_name,
+                   auditee_signed_date,
+                   next_audit
             FROM safety_assurance
             WHERE tenant_id = :tenant_id
-            AND user_id = :user_id
             ORDER BY audit_date DESC
         """)
 
         records_result = db.session.execute(
             query,
-            {"tenant_id": tenant_id, "user_id": user_id}
+            {"tenant_id": tenant_id}
         ).mappings().all()
 
         latest = records_result[0] if records_result else None
