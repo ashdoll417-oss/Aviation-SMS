@@ -833,31 +833,28 @@ def create_app(config_class=Config):
     def send_audit_report_email(audit_id):
         import io
         from docx import Document
-        from docx.shared import Pt
+        from docx.shared import Pt, Inches
         from docx.enum.text import WD_ALIGN_PARAGRAPH
         from sqlalchemy import text
-
+        from flask import request, flash, redirect, url_for
+        
+        # 1. Active security context extraction
+        active_user = _safe_get_current_user()
+        tenant_id = str(getattr(active_user, 'tenant_id', None))
+        
+        # 2. Extract input values safely from the modal view post submission
+        finding_details = request.form.get('finding_details', '').strip()
+        recipient_email = request.form.get('recipient_email', '').strip()
+        
+        if not recipient_email:
+            flash("A valid recipient email address is required to process the report delivery.", "danger")
+            return redirect(url_for('safety_assurance'))
+            
         try:
-            # 1. Tenant verification context
-            active_user = _safe_get_current_user()
-            tenant_id = str(getattr(active_user, 'tenant_id', None))
-
-            # 2. Extract inputs from the user interface form modal
-            finding_details = request.form.get('finding_details', '').strip()
-            recipient_email = request.form.get('recipient_email', '').strip()
-
-            if not tenant_id:
-                flash("Audit record not found or access denied.", "danger")
-                return redirect(url_for('safety_assurance'))
-
-            if not recipient_email:
-                flash("A valid recipient email address is required to transmit the report.", "danger")
-                return redirect(url_for('safety_assurance'))
-
-            # 3. Update the audit record live with the logged findings and destination email
+            # 3. Save findings and update recipient targets directly inside safety_assurance
             update_sql = text("""
-                UPDATE safety_assurance
-                SET finding_details = :finding_details,
+                UPDATE safety_assurance 
+                SET finding_details = :finding_details, 
                     auditee_email = :recipient_email,
                     status = 'Open'
                 WHERE id = :audit_id AND tenant_id = :tenant_id
@@ -869,94 +866,161 @@ def create_app(config_class=Config):
                 "tenant_id": tenant_id
             })
             db.session.commit()
-
-            # 4. Fetch the fully integrated dataset row for document building
+            
+            # 4. Fetch updated parameters to sync into the .docx layout fields
             query = text("""
-                SELECT id, audit_date, target_month, audit_scope, status,
+                SELECT id, audit_date, target_month, audit_scope, status, 
                        auditee_responder_name, auditee_remarks, finding_details, auditee_email
-                FROM safety_assurance
+                FROM safety_assurance 
                 WHERE id = :audit_id AND tenant_id = :tenant_id
             """)
             record = db.session.execute(query, {"audit_id": audit_id, "tenant_id": tenant_id}).mappings().first()
-
-            if not record:
-                flash("Audit record not found or access denied.", "danger")
-                return redirect(url_for('safety_assurance'))
-
-            # 5. Build the custom document in memory
+            
+            # 5. Initialize Document and set margins to prevent table overflowing layout limits
             doc = Document()
+            for section in doc.sections:
+                section.top_margin = Inches(1)
+                section.bottom_margin = Inches(1)
+                section.left_margin = Inches(1)
+                section.right_margin = Inches(1)
+                
             style = doc.styles['Normal']
             style.font.name = 'Arial'
-            style.font.size = Pt(11)
+            style.font.size = Pt(10.5)
+            
+            # =========================
+            # AISL-SD-011 STRUCTURE
+            # =========================
 
-            title = doc.add_paragraph()
-            title_run = title.add_run(f"INTERNAL SAFETY AUDIT REPORT — {record['audit_scope']}")
-            title_run.bold = True
-            title_run.font.size = Pt(14)
-            title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            # Top Header Table (2 Columns, 4 Rows)
+            top_table = doc.add_table(rows=4, cols=2)
+            top_table.style = 'Table Grid'
 
-            # Overview data matrix table
-            table = doc.add_table(rows=4, cols=2)
-            table.style = 'Table Grid'
-            table.rows[0].cells[0].text = f"Audit Date: {record['audit_date'] or 'N/A'}"
-            table.rows[0].cells[1].text = f"Target Window: {record['target_month'] or 'N/A'}"
-            table.rows[1].cells[0].text = f"Audit Scope/Area: {record['audit_scope'] or 'N/A'}"
-            table.rows[1].cells[1].text = f"Auditee Point of Contact: {record['auditee_email'] or 'N/A'}"
-            table.rows[2].cells[0].text = f"Current Status: {record['status'] or 'Open'}"
-            table.rows[2].cells[1].text = f"Verified Action Responder: {record['auditee_responder_name'] or 'Pending Response'}"
-            table.rows[3].cells[0].text = "Number of Raised Findings: 1" if record['finding_details'] else "Number of Raised Findings: 0"
-            table.rows[3].cells[1].text = f"Tracking ID: SMS/ASR/{record['id']}"
+            record_audit_date = record['audit_date'] or 'N/A'
+            record_audit_id = record['id']
+            record_audit_ref = f"SMS/ASR/{record_audit_id}"
 
-            doc.add_paragraph("\n2. EXECUTIVE INTRODUCTION").runs[0].bold = True
+            record_scope = record['audit_scope'] or 'N/A'
+            record_target_month = record['target_month'] or 'N/A'
+
+            auditee_email = record['auditee_email'] or 'N/A'
+            verified_responder = record.get('auditee_responder_name') or ''
+            verified_responder = verified_responder.strip() if isinstance(verified_responder, str) else verified_responder
+            verified_responder = verified_responder if verified_responder else "Pending Response"
+
+            findings_present = True if (record.get('finding_details') and str(record.get('finding_details')).strip()) else False
+            findings_count = 1 if findings_present else 0
+
+            status_val = record.get('status') or 'Open'
+
+            top_table.rows[0].cells[0].text = f"{record_audit_date}"
+            top_table.rows[0].cells[1].text = f"{record_audit_ref}"
+
+            top_table.rows[1].cells[0].text = f"{record_scope}"
+            top_table.rows[1].cells[1].text = f"{record_target_month}"
+
+            top_table.rows[2].cells[0].text = f"{auditee_email}"
+            top_table.rows[2].cells[1].text = f"{verified_responder}"
+
+            top_table.rows[3].cells[0].text = f"{findings_count}"
+            top_table.rows[3].cells[1].text = f"{status_val}"
+
+            # Exact Section: Introduction (Bold) + exact text
+            h_intro = doc.add_paragraph("Introduction")
+            h_intro.runs[0].bold = True
             doc.add_paragraph(
-                f"This internal safety surveillance inspection was dynamically processed for scope framework area [{record['audit_scope']}] "
-                f"corresponding to schedule target cycle {record['target_month']}. "
-                f"This tracking document summarizes the current performance observations."
+                "The Internal Safety Audit was scheduled and carried out. "
+                "This audit report entails the summary of the audit carried out."
             )
 
-            doc.add_paragraph("\n3. DETAILS OF IDENTIFIED NON-CONFORMITIES & REMARKS").runs[0].bold = True
+            # Exact Section: Reference Documents (Bold) + include required items
+            h_ref = doc.add_paragraph("Reference Documents")
+            h_ref.runs[0].bold = True
             doc.add_paragraph(
-                f"{record['finding_details'] or 'No system deviations or immediate action items were noted during this check phase.'}"
+                "Internal Safety Audit Checklist, Relevant Authority Regulations, "
+                "Industry best practices, and Company procedures manuals "
+                "(MPM: AISL-001, SMSM: AISL-005, Training Manual: AISL-006, OSH Manual: AISL-007, "
+                "Workshop Procedures Manual: AISL-009)."
             )
 
-            doc.add_paragraph("\n\n4. AUTHORIZATION MATRIX").runs[0].bold = True
+            # Exact Section: General Comments/Observation (Bold) + exact text
+            h_gen = doc.add_paragraph("General Comments/Observation")
+            h_gen.runs[0].bold = True
+            doc.add_paragraph(
+                "The workshops are kept clean and well ventilated. "
+                "There are enough resources to perform the work required and safety standards are well observed "
+                "with emphasis given on the protection of personnel from hazards they are exposed to."
+            )
+
+            # Findings Text
+            h_find = doc.add_paragraph("Details of Raised Non-Conformities & Actions")
+            h_find.runs[0].bold = True
+            doc.add_paragraph(f"{record['finding_details'] or ''}")
+
+            # Analysis & Classification Table (Standard block)
+            analysis_table = doc.add_table(rows=2, cols=5)
+            analysis_table.style = 'Table Grid'
+
+            # Header row
+            analysis_headers = ["#", "Issue/s", "Intolerable", "Tolerable", "Acceptable"]
+            for i, hdr in enumerate(analysis_headers):
+                analysis_table.rows[0].cells[i].text = hdr
+
+            # Row 1
+            issue_text = record.get('finding_details') or ''
+            analysis_table.rows[1].cells[0].text = "1."
+            analysis_table.rows[1].cells[1].text = str(issue_text).strip()
+            analysis_table.rows[1].cells[2].text = "NIL"
+            analysis_table.rows[1].cells[3].text = "NIL"
+            analysis_table.rows[1].cells[4].text = "NIL"
+
+            # Footer legend
+            doc.add_paragraph(
+                "Intolerable: immediate action (7 days) | Tolerable: 30 to 60 days | "
+                "Acceptable: Acceptable as is."
+            )
+
+            # Signature Matrix Footer
+            sig_title = doc.add_paragraph("Authorization Matrix")
+            sig_title.runs[0].bold = True
             p_sig = doc.add_paragraph()
-            p_sig.add_run("Auditor Signature / Date: ___________________        ").bold = True
-            p_sig.add_run("Auditee Signature / Date: ___________________").bold = True
-
-            # Save file to buffer stream
+            p_sig.add_run("Auditor Signature / Date: ___________________").bold = True
+            doc.add_paragraph("Auditee Signature / Date: ___________________").runs[0].bold = True
+            
+            # Flush document content safely into byte stream memory segment
             target_stream = io.BytesIO()
             doc.save(target_stream)
             target_stream.seek(0)
-
-            # 6. DISPATCH secure workspace email attachment
+            
+            # 6. Dispatch email notification message block using global platform mail instance
+            from flask_mail import Message
+            mail = current_app.extensions.get('mail')
+            if mail is None:
+                flash("Email service is not configured. Unable to dispatch report.", "danger")
+                return redirect(url_for('safety_assurance'))
+            
             clean_filename = f"Audit_Report_ID_{record['id']}_{record['audit_scope']}.docx".replace(" ", "_")
-
+            
             msg = Message(
                 subject=f"Action Required: Internal Safety Audit Report - {record['audit_scope']}",
                 recipients=[recipient_email],
+                body=f"Dear Team,\n\nPlease find attached the formal Internal Safety Audit Report regarding the recent {record['audit_scope']} workshop evaluation.\n\nKindly review the listed discrepancies and submit your operational corrective action plans directly back through your workspace tracking portal tracking links.\n\nBest Regards,\nHead of Safety Office"
             )
-            msg.body = (
-                "Dear Team,\n\n"
-                f"Please find attached the formal Internal Safety Audit Report regarding the recent {record['audit_scope']} evaluation.\n\n"
-                "Review the documented findings and submit your feedback responses directly through the workspace portal links.\n\n"
-                "Best Regards,\nHead of Safety Office"
-            )
+            
             msg.attach(
                 filename=clean_filename,
                 content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                data=target_stream.read(),
+                data=target_stream.read()
             )
-
             mail.send(msg)
-
-            flash(f"Audit report generated and dispatched successfully to {recipient_email}!", "success")
-            return redirect(url_for('safety_assurance'))
-
+            
+            flash(f"Audit report finalized and emailed successfully to {recipient_email}!", "success")
+            
         except Exception as e:
-            print(f"Mail dispatch fault: {str(e)}")
-            flash(f"Failed to transmit report safely: {str(e)}", "danger")
-            return redirect(url_for('safety_assurance'))
+            print(f"Mailing system transaction crash context trace: {str(e)}")
+            flash(f"System failed to transmit report safely via email: {str(e)}", "danger")
+            
+        return redirect(url_for('safety_assurance'))
 
     @app.route('/safety/download-plan/<int:record_id>')
     @login_required

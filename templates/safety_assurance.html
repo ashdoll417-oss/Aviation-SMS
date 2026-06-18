@@ -149,20 +149,43 @@
                     <span class="text-muted small">No File</span>
                   {% endif %}
 
-                  <div class="border p-2 rounded bg-light text-start mt-2" style="max-width: 280px; font-size: 0.85rem;">
-                    <form action="{{ url_for('send_audit_report_email', audit_id=record['id']) }}" method="POST">
-                      <div class="mb-1">
-                        <label class="form-label fw-bold mb-0 text-dark">Document Findings Found:</label>
-                        <textarea name="finding_details" class="form-control form-control-sm" rows="2" placeholder="Describe discrepancies or write 'NONE'..." required></textarea>
+                  <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#sendReportModal{{ record['id'] }}" style="padding: 2px 6px; font-size: 0.8rem; margin-top: 4px;">
+                    <i class="bi bi-envelope"></i> Send Report
+                  </button>
+                  
+                  <div class="modal fade" id="sendReportModal{{ record['id'] }}" dataType="dialog" tabindex="-1" aria-labelledby="reportModalLabel{{ record['id'] }}" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                      <div class="modal-content shadow">
+                        <div class="modal-header bg-dark text-white py-2">
+                          <h6 class="modal-title" id="reportModalLabel{{ record['id'] }}">
+                            <i class="bi bi-file-earmark-text"></i> Safety Report Workspace — ID: {{ record['id'] }}
+                          </h6>
+                          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form action="{{ url_for('send_audit_report_email', audit_id=record['id']) }}" method="POST">
+                          <div class="modal-body text-start">
+                            <div class="mb-2">
+                              <label class="form-label small fw-bold text-secondary mb-1">Audit Scope Area Target:</label>
+                              <input type="text" class="form-control form-control-sm bg-light" value="{{ record['audit_scope'] }}" disabled>
+                            </div>
+                            <div class="mb-2">
+                              <label class="form-label small fw-bold text-dark mb-1">Documented Findings / Non-Conformities Found:</label>
+                              <textarea name="finding_details" class="form-control form-control-sm" rows="4" placeholder="Log system deviations, findings details or note 'NONE' as required..." required></textarea>
+                            </div>
+                            <div class="mb-1">
+                              <label class="form-label small fw-bold text-dark mb-1">Target Recipient Auditee Email Address:</label>
+                              <input type="email" name="recipient_email" class="form-control form-control-sm" placeholder="e.g., manager@workshop.com" required>
+                            </div>
+                          </div>
+                          <div class="modal-footer py-1">
+                            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-sm btn-success">
+                              <i class="bi bi-send"></i> Compile &amp; Transmit Report
+                            </button>
+                          </div>
+                        </form>
                       </div>
-                      <div class="mb-2">
-                        <label class="form-label fw-bold mb-0 text-dark">Send to Auditee Email:</label>
-                        <input type="email" name="recipient_email" class="form-control form-control-sm" placeholder="auditee@company.com" required>
-                      </div>
-                      <button type="submit" class="btn btn-sm btn-primary w-100" style="font-size: 0.75rem; padding: 2px 4px;">
-                        <i class="bi bi-cursor"></i> Save Findings &amp; Email Report
-                      </button>
-                    </form>
+                    </div>
                   </div>
 
                   <form
