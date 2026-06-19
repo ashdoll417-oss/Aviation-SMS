@@ -821,6 +821,19 @@ def create_app(config_class=Config):
         latest = records_result[0] if records_result else None
         assurances = records_result  # back-compat variable name
 
+        # DIAGNOSTIC LOGGING
+        print("=== SAFETY ASSURANCE DIAGNOSTIC START ===")
+        print(f"Current logged-in user: {active_user}")
+        print(f"Current user tenant_id raw: {getattr(active_user, 'tenant_id', 'NOT FOUND')}")
+        print(f"Resolved route tenant_id variable: {tenant_id!r}")
+        
+        # Let's fetch absolutely everything with NO filters to see what is actually in the table
+        all_records = db.session.execute(text("SELECT id, audit_scope, status, tenant_id FROM safety_assurance")).mappings().all()
+        print(f"TOTAL UNFILTERED RECORDS IN DB: {len(all_records)}")
+        for r in all_records:
+            print(f"   -> Record ID: {r['id']} | Scope: {r['audit_scope']} | Status: {r['status']} | Tenant ID in DB: {r['tenant_id']!r}")
+        print("=== SAFETY ASSURANCE DIAGNOSTIC END ===")
+
         return render_template(
             'safety_assurance.html',
             records=records_result,
