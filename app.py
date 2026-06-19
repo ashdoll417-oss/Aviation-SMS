@@ -772,24 +772,21 @@ def create_app(config_class=Config):
         from sqlalchemy import text
 
         active_user = _safe_get_current_user()
-        
-        # Safely extract the raw tenant value
-        raw_tenant = None
-        if active_user and hasattr(active_user, 'tenant_id'):
-            raw_tenant = active_user.tenant_id
-        elif hasattr(current_user, 'tenant_id'):
-            raw_tenant = current_user.tenant_id
-            
-        # If it is missing, fallback to a sensible default or flash a warning, but DO NOT cast None to "None"
-        if not raw_tenant:
-            print("DEBUG WARNING: Active user context has no tenant_id!")
-            tenant_id = "1" # Or whatever your base default organization tenant integer/string is
-        else:
-            tenant_id = str(raw_tenant)
+
+        # Safely extract tenant_id WITHOUT stringifying a None into "None"
+        tenant_id = getattr(active_user, 'tenant_id', None) if active_user else None
+        if tenant_id is None:
+            flash("Tenant context missing. Please log in again.", "danger")
+            return redirect(url_for('dashboard'))
+
+        tenant_id = str(tenant_id).strip()
+        if not tenant_id or tenant_id.lower() == "none":
+            flash("Invalid tenant context. Please log in again.", "danger")
+            return redirect(url_for('dashboard'))
 
         print(f"DEBUG ASSURANCE: Resolved live tenant_id as: {tenant_id!r}")
 
-        # 2. Execute explicit query using strictly tenant_id constraint
+        # Execute explicit query using strictly tenant_id constraint
         query = text("""
             SELECT id, 
                    audit_date, 
@@ -811,7 +808,7 @@ def create_app(config_class=Config):
             WHERE tenant_id = :tenant_id
             ORDER BY audit_date DESC
         """)
-        
+
         try:
             records_result = db.session.execute(query, {"tenant_id": tenant_id}).mappings().all()
         except Exception as e:
