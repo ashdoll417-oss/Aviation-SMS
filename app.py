@@ -804,6 +804,9 @@ def create_app(config_class=Config):
             print(f"Database fetch breakdown log: {str(e)}")
             records_result = []
 
+        print(f"DEBUG: safety_assurance tenant_id used in GET is: {tenant_id!r}")
+        print(f"DEBUG: Found {len(records_result)} safety assurance records for this tenant.")
+
         latest = records_result[0] if records_result else None
         assurances = records_result  # back-compat variable name
 
