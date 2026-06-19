@@ -771,75 +771,65 @@ def create_app(config_class=Config):
     def safety_assurance():
         from sqlalchemy import text
 
-        active_user = _safe_get_current_user()
-
-        # Safely extract tenant_id WITHOUT stringifying a None into "None"
-        tenant_id = getattr(active_user, 'tenant_id', None) if active_user else None
-        if tenant_id is None:
-            flash("Tenant context missing. Please log in again.", "danger")
-            return redirect(url_for('dashboard'))
-
-        tenant_id = str(tenant_id).strip()
-        if not tenant_id or tenant_id.lower() == "none":
-            flash("Invalid tenant context. Please log in again.", "danger")
-            return redirect(url_for('dashboard'))
-
-        print(f"DEBUG ASSURANCE: Resolved live tenant_id as: {tenant_id!r}")
-
-        # Execute explicit query using strictly tenant_id constraint
-        query = text("""
-            SELECT id, 
-                   audit_date, 
-                   target_month, 
-                   audit_scope, 
-                   status, 
-                   finding_details,
-                   auditee_email,
-                   auditee_responder_name, 
-                   auditee_remarks,
-                   description_of_conformance,
-                   root_causes,
-                   immediate_corrective_action,
-                   system_alteration,
-                   auditee_signature_name,
-                   auditee_signed_date,
-                   next_audit
-            FROM safety_assurance 
-            WHERE tenant_id = :tenant_id
-            ORDER BY audit_date DESC
-        """)
+        # Clear any inherited dead transactions instantly (prevents InFailedSqlTransaction cascades)
+        db.session.rollback()
 
         try:
+            active_user = _safe_get_current_user()
+            tenant_id = str(getattr(active_user, 'tenant_id', '1')) if active_user else "1"
+
+            # Execute explicit query using strictly tenant_id constraint
+            query = text("""
+                SELECT id, audit_date, target_month, audit_scope, status, finding_details, 
+                       auditee_email, auditee_responder_name, auditee_remarks, description_of_conformance, 
+                       root_causes, immediate_corrective_action, system_alteration, 
+                       auditee_signature_name, auditee_signed_date, next_audit 
+                FROM safety_assurance 
+                WHERE tenant_id = :tenant_id 
+                ORDER BY audit_date DESC
+            """)
             records_result = db.session.execute(query, {"tenant_id": tenant_id}).mappings().all()
-        except Exception as e:
-            print(f"Database fetch breakdown log: {str(e)}")
+            print(f"DIAGNOSTIC SUCCESS: Found {len(records_result)} records for tenant {tenant_id}")
+
+            latest = records_result[0] if records_result else None
+            assurances = records_result  # back-compat variable name
+
+            # DIAGNOSTIC LOGGING (wrapped so DB issues never crash this route)
+            print("=== SAFETY ASSURANCE DIAGNOSTIC START ===")
+            print(f"Current logged-in user: {active_user}")
+            print(f"Current user tenant_id raw: {getattr(active_user, 'tenant_id', 'NOT FOUND')}")
+            print(f"Resolved route tenant_id variable: {tenant_id!r}")
+            
+            all_records = db.session.execute(
+                text("SELECT id, audit_scope, status, tenant_id FROM safety_assurance")
+            ).mappings().all()
+            print(f"TOTAL UNFILTERED RECORDS IN DB: {len(all_records)}")
+            for r in all_records:
+                print(
+                    f"   -> Record ID: {r['id']} | Scope: {r['audit_scope']} | "
+                    f"Status: {r['status']} | Tenant ID in DB: {r['tenant_id']!r}"
+                )
+            print("=== SAFETY ASSURANCE DIAGNOSTIC END ===")
+
+            return render_template(
+                'safety_assurance.html',
+                records=records_result,
+                latest=latest,
+                assurances=assurances
+            )
+        except Exception as database_error:
+            print(f"DIAGNOSTIC ERROR TRAPPED: {str(database_error)}")
+            db.session.rollback()
             records_result = []
+            latest = None
+            assurances = []
 
-        print(f"DEBUG: safety_assurance tenant_id used in GET is: {tenant_id!r}")
-        print(f"DEBUG: Found {len(records_result)} safety assurance records for this tenant.")
-
-        latest = records_result[0] if records_result else None
-        assurances = records_result  # back-compat variable name
-
-        # DIAGNOSTIC LOGGING
-        print("=== SAFETY ASSURANCE DIAGNOSTIC START ===")
-        print(f"Current logged-in user: {active_user}")
-        print(f"Current user tenant_id raw: {getattr(active_user, 'tenant_id', 'NOT FOUND')}")
-        print(f"Resolved route tenant_id variable: {tenant_id!r}")
-        
-        # Let's fetch absolutely everything with NO filters to see what is actually in the table
-        all_records = db.session.execute(text("SELECT id, audit_scope, status, tenant_id FROM safety_assurance")).mappings().all()
-        print(f"TOTAL UNFILTERED RECORDS IN DB: {len(all_records)}")
-        for r in all_records:
-            print(f"   -> Record ID: {r['id']} | Scope: {r['audit_scope']} | Status: {r['status']} | Tenant ID in DB: {r['tenant_id']!r}")
-        print("=== SAFETY ASSURANCE DIAGNOSTIC END ===")
-
-        return render_template(
-            'safety_assurance.html',
-            records=records_result,
-            latest=latest,
-            assurances=assurances
-        )
+            return render_template(
+                'safety_assurance.html',
+                records=records_result,
+                latest=latest,
+                assurances=assurances
+            )
 
     @app.route('/safety/assurance/delete/<int:audit_id>', methods=['POST'])
     @login_required
