@@ -1417,8 +1417,18 @@ def create_app(config_class=Config):
         # 2. DATE FIX & DATABASE SAVE FIRST (commit immediately BEFORE executing the email code)
         try:
             # --- HOTFIX: enforce tenant identity + public portal tracking attrs on the ORM object ---
+            # Safe Tenant resolution fix
             active_user = _safe_get_current_user()
-            current_tenant = str(getattr(active_user, 'tenant_id', None))
+            user_record = User.query.get(session.get('user_id')) if session.get('user_id') else None
+            
+            raw_tenant = None
+            if active_user and getattr(active_user, 'tenant_id', None):
+                raw_tenant = active_user.tenant_id
+            elif user_record and getattr(user_record, 'tenant_id', None):
+                raw_tenant = user_record.tenant_id
+                
+            # If a tenant exists, use its string conversion. Otherwise, default to "1" or integer 1 context
+            current_tenant = str(raw_tenant) if raw_tenant else "1"
 
             assurance.tenant_id = current_tenant
             assurance.auditee_responder_name = None
