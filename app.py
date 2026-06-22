@@ -1524,10 +1524,11 @@ def create_app(config_class=Config):
 
                 mail.send(msg)
 
-        except Exception as mail_err:
-            current_app.logger.error(f"Mail dispatch error: {mail_err}")
-            flash('Safety Assurance record saved successfully.')
-            return redirect(url_for('safety_assurance'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"DATABASE CRITICAL FAIL: {str(e)}")
+            # Force the application to show the real database error on screen
+            raise e
 
         flash('Safety Assurance record saved successfully.')
         return redirect(url_for('safety_assurance'))
