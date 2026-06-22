@@ -871,16 +871,20 @@ def create_app(config_class=Config):
         
         # 1. Active security context extraction
         active_user = _safe_get_current_user()
-        tenant_id = str(getattr(active_user, 'tenant_id', None))
-        
+        tenant_id = str(getattr(active_user, 'tenant_id', None)) if active_user else None
+
         # 2. Extract input values safely from the modal view post submission
         finding_details = request.form.get('finding_details', '').strip()
         recipient_email = request.form.get('recipient_email', '').strip()
-        
+
         if not recipient_email:
             flash("A valid recipient email address is required to process the report delivery.", "danger")
             return redirect(url_for('safety_assurance'))
-            
+
+        if not tenant_id or tenant_id in ("None", "null", ""):
+            flash("Unable to save audit: tenant context is missing for the logged-in user.", "danger")
+            return redirect(url_for('safety_assurance'))
+
         try:
             # 3. Save findings and update recipient targets directly inside safety_assurance
             update_sql = text("""
@@ -890,14 +894,22 @@ def create_app(config_class=Config):
                     status = 'Open'
                 WHERE id = :audit_id AND tenant_id = :tenant_id
             """)
-            db.session.execute(update_sql, {
+            update_result = db.session.execute(update_sql, {
                 "finding_details": finding_details,
                 "recipient_email": recipient_email,
                 "audit_id": audit_id,
                 "tenant_id": tenant_id
             })
             db.session.commit()
-            
+
+            # If nothing was updated, don't proceed to email/docx generation
+            if getattr(update_result, "rowcount", 0) < 1:
+                flash(
+                    "Audit record not saved: unauthorized or tenant mismatch (no rows updated).",
+                    "danger"
+                )
+                return redirect(url_for('safety_assurance'))
+
             # 4. Fetch updated parameters to sync into the .docx layout fields
             query = text("""
                 SELECT id, audit_date, target_month, audit_scope, status, 
@@ -906,6 +918,13 @@ def create_app(config_class=Config):
                 WHERE id = :audit_id AND tenant_id = :tenant_id
             """)
             record = db.session.execute(query, {"audit_id": audit_id, "tenant_id": tenant_id}).mappings().first()
+
+            if not record:
+                flash(
+                    "Audit record not found after update (possible tenant mismatch).",
+                    "danger"
+                )
+                return redirect(url_for('safety_assurance'))
             
             # 5. Initialize Document and set margins to prevent table overflowing layout limits
             doc = Document()
