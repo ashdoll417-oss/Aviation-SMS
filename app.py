@@ -788,9 +788,8 @@ def create_app(config_class=Config):
             assurances = records_result  # back-compat variable name
         except Exception as e:
             db.session.rollback()
-            records_result = []
-            latest = None
-            assurances = []
+            print(f"CRITICAL GET QUERY FAILED: {str(e)}")
+            raise e
 
         return render_template(
             'safety_assurance.html',
