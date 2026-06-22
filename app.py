@@ -1416,7 +1416,6 @@ def create_app(config_class=Config):
 
         # 2. DATE FIX & DATABASE SAVE FIRST (commit immediately BEFORE executing the email code)
         try:
-            # --- HOTFIX: enforce tenant identity + public portal tracking attrs on the ORM object ---
             # Safe Tenant resolution fix
             active_user = _safe_get_current_user()
             user_record = User.query.get(session.get('user_id')) if session.get('user_id') else None
@@ -1427,25 +1426,23 @@ def create_app(config_class=Config):
             elif user_record and getattr(user_record, 'tenant_id', None):
                 raw_tenant = user_record.tenant_id
                 
-            # If a tenant exists, use its string conversion. Otherwise, default to "1" or integer 1 context
             current_tenant = str(raw_tenant) if raw_tenant else "1"
-
             assurance.tenant_id = current_tenant
-            assurance.auditee_responder_name = None
-            assurance.auditee_remarks = None
-            assurance.proposed_alternative_date = None
+
+            # ONLY assign the base confirmed table columns
+            assurance.status = status
+            assurance.audit_scope = audit_scope
+            assurance.target_month = target_month
+            assurance.auditee_email = auditee_email
 
             db.session.add(assurance)
             db.session.commit()
 
-            # Define the exact variable string the down-stream mail generator relies on
             audit_id_str = str(assurance.id)
-            # --- END HOTFIX ---
         except Exception as e:
             db.session.rollback()
-            print(f"DATABASE ERROR: {str(e)}")
-            current_app.logger.error(str(e))
-            flash('Database error while saving Safety Assurance record.')
+            print(f"DATABASE SAVE CRASHED: {str(e)}")
+            flash('Database error saving record.')
             return redirect(url_for('safety_assurance'))
 
         # 3. HTML EMAIL LAYOUT WITH INTERACTIVE ACTIONS + 4. TOTAL ISOLATION SAFEGUARD
