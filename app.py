@@ -771,7 +771,7 @@ def create_app(config_class=Config):
 
             query = text("""
                 SELECT id, audit_date, target_month, audit_scope, status, finding_details,
-                       auditee_email, auditee_responder_name, auditee_remarks, description_of_conformance,
+                       auditee_email, auditee_responder_name, auditee_remarks,
                        root_causes, immediate_corrective_action, system_alteration,
                        auditee_signature_name, auditee_signed_date,
                        next_audit_date AS next_audit
