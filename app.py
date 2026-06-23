@@ -824,10 +824,6 @@ def create_app(config_class=Config):
         from docx.enum.text import WD_ALIGN_PARAGRAPH
         from sqlalchemy import text
         from flask import request, flash, redirect, url_for
-        
-        # 1. Active security context extraction
-        active_user = _safe_get_current_user()
-        tenant_id = str(getattr(active_user, 'tenant_id', None)) if active_user else None
 
         # 2. Extract input values safely from the modal view post submission
         finding_details = request.form.get('finding_details', '').strip()
@@ -837,49 +833,38 @@ def create_app(config_class=Config):
             flash("A valid recipient email address is required to process the report delivery.", "danger")
             return redirect(url_for('safety_assurance'))
 
-        if not tenant_id or tenant_id in ("None", "null", ""):
-            flash("Unable to save audit: tenant context is missing for the logged-in user.", "danger")
-            return redirect(url_for('safety_assurance'))
-
         try:
             # 3. Save findings and update recipient targets directly inside safety_assurance
             update_sql = text("""
-                UPDATE safety_assurance 
-                SET finding_details = :finding_details, 
+                UPDATE safety_assurance
+                SET finding_details = :finding_details,
                     auditee_email = :recipient_email,
                     status = 'Open'
-                WHERE id = :audit_id AND tenant_id = :tenant_id
+                WHERE id = :audit_id
             """)
             update_result = db.session.execute(update_sql, {
                 "finding_details": finding_details,
                 "recipient_email": recipient_email,
-                "audit_id": audit_id,
-                "tenant_id": tenant_id
+                "audit_id": audit_id
             })
             db.session.commit()
 
             # If nothing was updated, don't proceed to email/docx generation
             if getattr(update_result, "rowcount", 0) < 1:
-                flash(
-                    "Audit record not saved: unauthorized or tenant mismatch (no rows updated).",
-                    "danger"
-                )
+                flash("Audit record not found or not accessible.", "danger")
                 return redirect(url_for('safety_assurance'))
 
             # 4. Fetch updated parameters to sync into the .docx layout fields
             query = text("""
-                SELECT id, audit_date, target_month, audit_scope, status, 
+                SELECT id, audit_date, target_month, audit_scope, status,
                        auditee_responder_name, auditee_remarks, finding_details, auditee_email
-                FROM safety_assurance 
-                WHERE id = :audit_id AND tenant_id = :tenant_id
+                FROM safety_assurance
+                WHERE id = :audit_id
             """)
-            record = db.session.execute(query, {"audit_id": audit_id, "tenant_id": tenant_id}).mappings().first()
+            record = db.session.execute(query, {"audit_id": audit_id}).mappings().first()
 
             if not record:
-                flash(
-                    "Audit record not found after update (possible tenant mismatch).",
-                    "danger"
-                )
+                flash("Audit record not found after update.", "danger")
                 return redirect(url_for('safety_assurance'))
             
             # 5. Initialize Document and set margins to prevent table overflowing layout limits
@@ -1007,7 +992,7 @@ def create_app(config_class=Config):
             
             clean_filename = f"Audit_Report_ID_{record['id']}_{record['audit_scope']}.docx".replace(" ", "_")
             
-            # Create a public response token (best-effort; requires DB column to exist)
+            # Create a public response token and include it in response link
             import secrets, datetime
             token = secrets.token_urlsafe(32)
             token_expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=30)
@@ -1082,21 +1067,12 @@ def create_app(config_class=Config):
     @login_required
     @require_module('audits')
     def send_audit_report(audit_id):
-        active_user = _safe_get_current_user()
-        tenant_id = getattr(active_user, 'tenant_id', None)
-
-        if not tenant_id:
-            flash("Audit record not found or unauthorized.", "danger")
-            return redirect(url_for('safety_assurance'))
-
-        # Securely look up the specific audit by tenant_id using a raw SQL text query
-        sql = text("SELECT * FROM safety_assurance WHERE id = :audit_id AND tenant_id = :tenant_id")
-        audit = db.session.execute(
-            sql, {"audit_id": audit_id, "tenant_id": str(tenant_id)}
-        ).mappings().first()
+        # Securely look up the specific audit by its unique ID (no tenant_id column exists in SafetyAssurance model)
+        sql = text("SELECT * FROM safety_assurance WHERE id = :audit_id")
+        audit = db.session.execute(sql, {"audit_id": audit_id}).mappings().first()
 
         if not audit:
-            flash("Audit record not found or unauthorized.", "danger")
+            flash("Audit record not found.", "danger")
             return redirect(url_for('safety_assurance'))
 
         # Re-use our robust try/except mail execution block here to send the stylized corporate email layout
@@ -1110,8 +1086,21 @@ def create_app(config_class=Config):
 
             base_url = request.host_url.rstrip('/')
 
-            accept_url = f"{base_url}/safety/assurance/respond/{audit_id}/accept"
-            reschedule_url = f"{base_url}/safety/assurance/respond/{audit_id}/reschedule"
+            # Create a public response token and include it in accept/reschedule links
+            import secrets, datetime
+            token = secrets.token_urlsafe(32)
+            token_expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=30)
+            try:
+                db.session.execute(
+                    text("UPDATE safety_assurance SET public_respond_token = :token, public_respond_token_expires_at = :exp WHERE id = :audit_id"),
+                    {"token": token, "exp": token_expires_at, "audit_id": audit_id}
+                )
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
+            accept_url = f"{base_url}/safety/assurance/respond/{audit_id}/accept?token={token}"
+            reschedule_url = f"{base_url}/safety/assurance/respond/{audit_id}/reschedule?token={token}"
 
             audit_scope = audit.get('audit_scope') or 'Maintenance Facilities'
             target_month = audit.get('target_month') or 'Scheduled Month'
@@ -1208,9 +1197,8 @@ def create_app(config_class=Config):
         from flask import request, render_template, flash, redirect, url_for
         import datetime
         import hmac
-        import secrets
 
-        token = request.args.get('token', '')
+        token = request.args.get('token') or request.form.get('token') or ''
         if not token:
             return "Missing token.", 403
 
@@ -1280,7 +1268,8 @@ def create_app(config_class=Config):
         if not record:
             return "Audit record link invalid or expired.", 404
 
-        return render_template('public_audit_response.html', record=record)
+        # Ensure template receives token for hidden field on POST
+        return render_template('public_audit_response.html', record=record, token=token)
 
     @app.route('/safety/assurance/respond/<audit_id>/<action>', methods=['GET', 'POST'])
     def respond_to_audit_schedule(audit_id, action):
@@ -1288,7 +1277,7 @@ def create_app(config_class=Config):
         import hmac
         import datetime
 
-        token = request.args.get('token', '')
+        token = request.args.get('token') or request.form.get('token') or ''
         if not token:
             return "Missing token.", 403
 
@@ -1335,8 +1324,8 @@ def create_app(config_class=Config):
 
             return render_template('public_audit_success.html', audit=audit, action=action)
 
-        # GET request shows the input form
-        return render_template('public_audit_respond.html', audit=audit, action=action)
+        # GET request shows the input form (template needs token hidden field)
+        return render_template('public_audit_respond.html', audit=audit, action=action, token=token)
 
     @app.route('/safety/assurance', methods=['POST'])
     @login_required
@@ -1354,8 +1343,9 @@ def create_app(config_class=Config):
         import base64
         from datetime import datetime
 
-        audit_date_in = request.form.get('audit_date')
-        next_audit_date_in = request.form.get('next_audit_date')
+        # Template uses audit_date_ui/next_audit_date_ui; keep backward-compatible fallbacks.
+        audit_date_in = request.form.get('audit_date_ui') or request.form.get('audit_date')
+        next_audit_date_in = request.form.get('next_audit_date_ui') or request.form.get('next_audit_date')
 
         # 1. DATE FIX & DATABASE SAVE FIRST (exact structure requested)
         try:
