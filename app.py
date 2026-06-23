@@ -779,7 +779,7 @@ def create_app(config_class=Config):
                 SELECT id, audit_date, target_month, audit_scope, status, finding_details, 
                        auditee_email, auditee_responder_name, auditee_remarks, description_of_conformance, 
                        root_causes, immediate_corrective_action, system_alteration, 
-                       auditee_signature_name, auditee_signed_date, next_audit 
+                       auditee_signature_name, auditee_signed_date, next_audit_date 
                 FROM safety_assurance 
                 ORDER BY audit_date DESC
             """)
