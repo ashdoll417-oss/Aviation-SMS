@@ -364,13 +364,8 @@ def create_app(config_class=Config):
         objectives = SafetyObjective.query.all()
         drills = SafetyDrill.query.all()
 
-        if tenant_id:
-            # Use raw SQL to avoid ORM namespace validation when columns are added out-of-band.
-            sql = text("SELECT * FROM safety_assurance WHERE tenant_id = :tenant_id")
-            rows = db.session.execute(sql, {"tenant_id": str(tenant_id)}).mappings().all()
-            assurances = rows
-        else:
-            assurances = []
+        # SafetyAssurance table has no tenant_id column in models.py; never filter by tenant_id.
+        assurances = []
 
         return render_template(
             'dashboard.html',
@@ -773,14 +768,14 @@ def create_app(config_class=Config):
 
         try:
             db.session.rollback() # Ensure transaction state is fresh
-            
-            # Bypassing tenant constraints temporarily to force the rows onto the dashboard
+
             query = text("""
-                SELECT id, audit_date, target_month, audit_scope, status, finding_details, 
-                       auditee_email, auditee_responder_name, auditee_remarks, description_of_conformance, 
-                       root_causes, immediate_corrective_action, system_alteration, 
-                       auditee_signature_name, auditee_signed_date, next_audit_date 
-                FROM safety_assurance 
+                SELECT id, audit_date, target_month, audit_scope, status, finding_details,
+                       auditee_email, auditee_responder_name, auditee_remarks, description_of_conformance,
+                       root_causes, immediate_corrective_action, system_alteration,
+                       auditee_signature_name, auditee_signed_date,
+                       next_audit_date AS next_audit
+                FROM safety_assurance
                 ORDER BY audit_date DESC
             """)
             records_result = db.session.execute(query).mappings().all()
@@ -804,18 +799,12 @@ def create_app(config_class=Config):
     def delete_safety_audit(audit_id):
         from sqlalchemy import text
 
-        active_user = _safe_get_current_user()
-        tenant_id = str(getattr(active_user, 'tenant_id', None))
-
         delete_sql = text("""
             DELETE FROM safety_assurance
-            WHERE id = :audit_id AND tenant_id = :tenant_id
+            WHERE id = :audit_id
         """)
 
-        result = db.session.execute(
-            delete_sql,
-            {"audit_id": audit_id, "tenant_id": tenant_id}
-        )
+        result = db.session.execute(delete_sql, {"audit_id": audit_id})
         db.session.commit()
 
         if getattr(result, "rowcount", 0) > 0:
@@ -1018,7 +1007,22 @@ def create_app(config_class=Config):
             
             clean_filename = f"Audit_Report_ID_{record['id']}_{record['audit_scope']}.docx".replace(" ", "_")
             
-            response_link = f"https://aviation-sms.vercel.app/public/safety/respond/{record['id']}"
+            # Create a public response token (best-effort; requires DB column to exist)
+            import secrets, datetime
+            token = secrets.token_urlsafe(32)
+            token_expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=30)
+
+            try:
+                db.session.execute(
+                    text("UPDATE safety_assurance SET public_respond_token = :token, public_respond_token_expires_at = :exp WHERE id = :audit_id"),
+                    {"token": token, "exp": token_expires_at, "audit_id": record['id']}
+                )
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
+            response_link = f"https://aviation-sms.vercel.app/public/safety/respond/{record['id']}?token={token}"
+
 
             msg = Message(
                 subject=f"Action Required: Internal Safety Audit Report - {record['audit_scope']}",
@@ -1203,6 +1207,28 @@ def create_app(config_class=Config):
         from sqlalchemy import text
         from flask import request, render_template, flash, redirect, url_for
         import datetime
+        import hmac
+        import secrets
+
+        token = request.args.get('token', '')
+        if not token:
+            return "Missing token.", 403
+
+        row = db.session.execute(
+            text("SELECT id, public_respond_token, public_respond_token_expires_at FROM safety_assurance WHERE id = :audit_id"),
+            {"audit_id": audit_id}
+        ).mappings().first()
+
+        if not row:
+            return "Audit record link invalid or expired.", 404
+
+        expires = row.get('public_respond_token_expires_at')
+        if expires and isinstance(expires, datetime.datetime) and expires < datetime.datetime.utcnow():
+            return "Token expired.", 403
+
+        stored = row.get('public_respond_token') or ''
+        if not hmac.compare_digest(stored, token):
+            return "Invalid token.", 403
 
         if request.method == 'POST':
             conformance = request.form.get('description_of_conformance', '').strip()
@@ -1259,13 +1285,28 @@ def create_app(config_class=Config):
     @app.route('/safety/assurance/respond/<audit_id>/<action>', methods=['GET', 'POST'])
     def respond_to_audit_schedule(audit_id, action):
         from sqlalchemy import text
+        import hmac
+        import datetime
 
-        # Securely look up the audit purely by its unique ID (no tenant check here since they are unauthenticated public users)
-        sql = text("SELECT * FROM safety_assurance WHERE id = :audit_id")
-        audit = db.session.execute(sql, {"audit_id": audit_id}).mappings().first()
+        token = request.args.get('token', '')
+        if not token:
+            return "Missing token.", 403
+
+        audit = db.session.execute(
+            text("SELECT * , public_respond_token, public_respond_token_expires_at FROM safety_assurance WHERE id = :audit_id"),
+            {"audit_id": audit_id}
+        ).mappings().first()
 
         if not audit:
             return "<h3>Invalid or expired audit invitation link.</h3>", 404
+
+        expires = audit.get('public_respond_token_expires_at')
+        if expires and hasattr(expires, 'tzinfo') and expires < datetime.datetime.utcnow():
+            return "<h3>Token expired.</h3>", 403
+
+        stored = audit.get('public_respond_token') or ''
+        if not hmac.compare_digest(stored, token):
+            return "<h3>Invalid token.</h3>", 403
 
         if request.method == 'POST':
             responder_name = request.form.get('responder_name')
@@ -1379,10 +1420,7 @@ def create_app(config_class=Config):
         assurance.audit_date = parsed_audit_date
         assurance.next_audit_date = parsed_next_date
 
-        # Safe Tenant Context Assignment (never throws AttributeError)
-        user_record = User.query.get(session.get('user_id')) if session.get('user_id') else None
-        if user_record and hasattr(user_record, 'tenant_id') and hasattr(assurance, 'tenant_id'):
-            assurance.tenant_id = user_record.tenant_id
+        # Tenant is intentionally NOT used for SafetyAssurance (no tenant_id column in model)
 
         assurance.finding_details = finding_details
         assurance.status = status
@@ -1402,20 +1440,7 @@ def create_app(config_class=Config):
 
         # 2. DATE FIX & DATABASE SAVE FIRST (commit immediately BEFORE executing the email code)
         try:
-            # Safe Tenant resolution fix
-            active_user = _safe_get_current_user()
-            user_record = User.query.get(session.get('user_id')) if session.get('user_id') else None
-            
-            raw_tenant = None
-            if active_user and getattr(active_user, 'tenant_id', None):
-                raw_tenant = active_user.tenant_id
-            elif user_record and getattr(user_record, 'tenant_id', None):
-                raw_tenant = user_record.tenant_id
-                
-            current_tenant = str(raw_tenant) if raw_tenant else "1"
-            assurance.tenant_id = current_tenant
-
-            # ONLY assign the base confirmed table columns
+            # Tenant is intentionally NOT used for SafetyAssurance (no tenant_id column in model)
             assurance.status = status
             assurance.audit_scope = audit_scope
             assurance.target_month = target_month
@@ -1433,18 +1458,34 @@ def create_app(config_class=Config):
 
         # 3. HTML EMAIL LAYOUT WITH INTERACTIVE ACTIONS + 4. TOTAL ISOLATION SAFEGUARD
         try:
-            if auditee_email:
+            if not auditee_email:
+                # No recipient => skip mailing but keep saving record
+                pass
+            else:
                 msg = Message(
                     subject=f"New Safety Audit Notification: {request.form.get('audit_scope', 'Schedules')}",
                     recipients=[auditee_email],
                 )
 
                 record_id = audit_id_str
-
                 base_url = request.host_url.rstrip('/')
 
-                accept_url = f"{base_url}/safety/assurance/respond/{audit_id if 'audit_id' in locals() else record_id}/accept"
-                reschedule_url = f"{base_url}/safety/assurance/respond/{audit_id if 'audit_id' in locals() else record_id}/reschedule"
+                # Create a public response token for this audit and include it in the acceptance/reschedule links
+                import secrets, datetime
+                token = secrets.token_urlsafe(32)
+                token_expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=30)
+
+                try:
+                    db.session.execute(
+                        text("UPDATE safety_assurance SET public_respond_token = :token, public_respond_token_expires_at = :exp WHERE id = :audit_id"),
+                        {"token": token, "exp": token_expires_at, "audit_id": record_id}
+                    )
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+                accept_url = f"{base_url}/safety/assurance/respond/{record_id}/accept?token={token}"
+                reschedule_url = f"{base_url}/safety/assurance/respond/{record_id}/reschedule?token={token}"
 
                 msg.html = f"""
 <html>

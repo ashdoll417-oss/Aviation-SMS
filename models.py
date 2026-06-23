@@ -114,6 +114,11 @@ class SafetyAssurance(db.Model):
     department_notified = db.Column(db.Boolean, default=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
+    # Public auditee response security
+    # NOTE: Requires DB migration to be effective. The code is written so it still compiles.
+    public_respond_token = db.Column(db.String(255), nullable=True)
+    public_respond_token_expires_at = db.Column(db.DateTime, nullable=True)
+
     def __repr__(self):
         return f'<SafetyAssurance {self.finding_details or "No findings"}>'
 
