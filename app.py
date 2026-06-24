@@ -770,11 +770,15 @@ def create_app(config_class=Config):
             db.session.rollback() # Ensure transaction state is fresh
 
             query = text("""
-                SELECT id, audit_date, target_month, audit_scope, status, finding_details,
-                       auditee_email, auditee_responder_name, auditee_remarks,
-                       root_causes, immediate_corrective_action, system_alteration,
-                       auditee_signature_name, auditee_signed_date,
-                       next_audit_date AS next_audit
+                SELECT
+                    id,
+                    audit_date,
+                    target_month,
+                    audit_scope,
+                    status,
+                    finding_details,
+                    auditee_email,
+                    next_audit_date AS next_audit
                 FROM safety_assurance
                 ORDER BY audit_date DESC
             """)
