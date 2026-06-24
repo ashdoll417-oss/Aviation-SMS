@@ -52,6 +52,9 @@ def create_app(config_class=Config):
     app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
 
     mail = Mail(app)
+    # Make Flask-Mail instance discoverable via current_app.extensions['mail']
+    # (other routes rely on it for sending emails).
+    app.extensions['mail'] = mail
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -991,6 +994,9 @@ def create_app(config_class=Config):
             from flask_mail import Message
             mail = current_app.extensions.get('mail')
             if mail is None:
+                current_app.logger.error(
+                    "Flask-Mail instance missing: current_app.extensions['mail'] is not set."
+                )
                 flash("Email service is not configured. Unable to dispatch report.", "danger")
                 return redirect(url_for('safety_assurance'))
             
@@ -1037,7 +1043,7 @@ def create_app(config_class=Config):
             flash(f"Audit report finalized and emailed successfully to {recipient_email}!", "success")
             
         except Exception as e:
-            print(f"Mailing system transaction crash context trace: {str(e)}")
+            current_app.logger.exception("Mailing system transaction crash context")
             flash(f"System failed to transmit report safely via email: {str(e)}", "danger")
             
         return redirect(url_for('safety_assurance'))
