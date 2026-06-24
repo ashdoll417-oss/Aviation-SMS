@@ -1436,6 +1436,9 @@ def create_app(config_class=Config):
             checklist_data = checklist_file.read()
             checklist_file.seek(0)
 
+        # IMPORTANT: Production DB schema for safety_assurance (per scripts/sync_all_tables.py)
+        # contains ONLY: id, audit_date, finding_details, status, next_audit_date, user_id.
+        # Do NOT assign ghost columns (audit_scope/target_month/department_notified/etc) here.
         assurance = SafetyAssurance.query.filter_by(user_id=user_id, audit_date=audit_date).first()
         if assurance is None:
             assurance = SafetyAssurance(
@@ -1443,46 +1446,17 @@ def create_app(config_class=Config):
                 finding_details=finding_details,
                 status=status,
                 next_audit_date=next_audit_date,
-                audit_scope=audit_scope,
-                target_month=target_month,
-                department_notified=dept_notified,
-                auditee_email=auditee_email,
-                notification_body=notification_body,
-                checklist_name=checklist_name,
-                checklist_data=checklist_data,
                 user_id=user_id,
             )
 
-        # Assign fields, including tenant-safe assignment, then commit BEFORE email code
         assurance.audit_date = parsed_audit_date
         assurance.next_audit_date = parsed_next_date
-
-        # Tenant is intentionally NOT used for SafetyAssurance (no tenant_id column in model)
-
         assurance.finding_details = finding_details
         assurance.status = status
-        assurance.audit_scope = audit_scope
-        assurance.target_month = target_month
-        assurance.department_notified = dept_notified
-        assurance.auditee_email = auditee_email
-        assurance.notification_body = notification_body
-
-        if checklist_name is not None and checklist_data is not None:
-            assurance.checklist_name = checklist_name
-            assurance.checklist_data = checklist_data
-
-        if audit_plan_filename is not None and audit_plan_data is not None:
-            assurance.audit_plan_filename = audit_plan_filename
-            assurance.audit_plan_data = audit_plan_data
 
         # 2. DATE FIX & DATABASE SAVE FIRST (commit immediately BEFORE executing the email code)
         try:
-            # Tenant is intentionally NOT used for SafetyAssurance (no tenant_id column in model)
             assurance.status = status
-            assurance.audit_scope = audit_scope
-            assurance.target_month = target_month
-            assurance.auditee_email = auditee_email
-
             db.session.add(assurance)
             db.session.commit()
 
@@ -1499,8 +1473,10 @@ def create_app(config_class=Config):
                 # No recipient => skip mailing but keep saving record
                 pass
             else:
+                # Keep email generation working even when DB schema doesn't include audit_scope/target_month/etc.
+                # Use incoming form values for email contents.
                 msg = Message(
-                    subject=f"New Safety Audit Notification: {request.form.get('audit_scope', 'Schedules')}",
+                    subject=f"New Safety Audit Notification: {audit_scope or 'Schedules'}",
                     recipients=[auditee_email],
                 )
 
@@ -1512,6 +1488,7 @@ def create_app(config_class=Config):
                 token = secrets.token_urlsafe(32)
                 token_expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=30)
 
+                # Public token columns may not exist in some schemas; best-effort only.
                 try:
                     db.session.execute(
                         text("UPDATE safety_assurance SET public_respond_token = :token, public_respond_token_expires_at = :exp WHERE id = :audit_id"),
@@ -1535,9 +1512,9 @@ def create_app(config_class=Config):
     <div style="max-width: 600px; margin: 0 auto; background-color: #242424; border-left: 1px solid #444; border-right: 1px solid #444; border-bottom: 1px solid #444; padding: 20px; color: #dddddd;">
         <h4 style="color: #ffc107; border-bottom: 1px solid #444; padding-bottom: 5px; margin-top: 0;">AUDIT DETAILS</h4>
         <table style="width: 100%; color: #dddddd; font-size: 14px; margin-bottom: 20px;">
-            <tr><td style="padding: 5px; width: 30%; font-weight: bold; color: #aaaaaa;">Audit Area:</td><td style="padding: 5px;">{assurance.audit_scope if assurance.audit_scope else 'Maintenance Facilities'}</td></tr>
+            <tr><td style="padding: 5px; width: 30%; font-weight: bold; color: #aaaaaa;">Audit Area:</td><td style="padding: 5px;">{audit_scope or 'Maintenance Facilities'}</td></tr>
             <tr><td style="padding: 5px; font-weight: bold; color: #aaaaaa;">Auditor:</td><td style="padding: 5px;">Head of Safety Office</td></tr>
-            <tr><td style="padding: 5px; font-weight: bold; color: #aaaaaa;">Schedule:</td><td style="padding: 5px;">{assurance.target_month if assurance.target_month else 'Scheduled Month'}</td></tr>
+            <tr><td style="padding: 5px; font-weight: bold; color: #aaaaaa;">Schedule:</td><td style="padding: 5px;">{target_month or 'Scheduled Month'}</td></tr>
         </table>
         
         <p style="font-size: 14px; line-height: 1.5;">
