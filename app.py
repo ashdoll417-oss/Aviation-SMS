@@ -1347,13 +1347,36 @@ def create_app(config_class=Config):
         audit_date_in = request.form.get('audit_date_ui') or request.form.get('audit_date')
         next_audit_date_in = request.form.get('next_audit_date_ui') or request.form.get('next_audit_date')
 
-        # 1. DATE FIX & DATABASE SAVE FIRST (exact structure requested)
-        try:
-            parsed_audit_date = datetime.strptime(audit_date_in.split('T')[0], '%Y-%m-%d').date() if audit_date_in else None
-            parsed_next_date = datetime.strptime(next_audit_date_in.split('T')[0], '%Y-%m-%d').date() if next_audit_date_in else None
-        except Exception:
+        # 1. Robust date parsing (handles YYYY-MM-DD and ISO-like strings with 'T')
+        def _parse_ui_date(val):
+            if not val:
+                return None
+            s = str(val).strip()
+            if not s:
+                return None
+
+            # Accept ISO-like: "YYYY-MM-DDTHH:MM" / "YYYY-MM-DDTHH:MM:SS"
+            if 'T' in s:
+                s = s.split('T', 1)[0].strip()
+
+            # Primary format: YYYY-MM-DD
+            try:
+                return datetime.strptime(s, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+            # Secondary fallback: allow YYYY/MM/DD
+            try:
+                return datetime.strptime(s.replace('/', '-'), '%Y-%m-%d').date()
+            except Exception:
+                return None
+
+        parsed_audit_date = _parse_ui_date(audit_date_in)
+        parsed_next_date = _parse_ui_date(next_audit_date_in)
+
+        # Ensure audit_date always has a value for DB lookup/saving.
+        if parsed_audit_date is None:
             parsed_audit_date = datetime.utcnow().date()
-            parsed_next_date = None
 
         # Set SQLAlchemy-searchable variables
         audit_date = parsed_audit_date
