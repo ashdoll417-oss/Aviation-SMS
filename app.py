@@ -1353,25 +1353,39 @@ def create_app(config_class=Config):
 
         # 1. Robust date parsing (handles YYYY-MM-DD and ISO-like strings with 'T')
         def _parse_ui_date(val):
+            """
+            Parse values from <input type="datetime-local"> or similar.
+
+            Returns a Python datetime (midnight if only a date is provided),
+            so it matches the SafetyAssurance DateTime columns.
+            """
             if not val:
                 return None
             s = str(val).strip()
             if not s:
                 return None
 
-            # Accept ISO-like: "YYYY-MM-DDTHH:MM" / "YYYY-MM-DDTHH:MM:SS"
-            if 'T' in s:
-                s = s.split('T', 1)[0].strip()
-
-            # Primary format: YYYY-MM-DD
+            # If the input includes time, parse full datetime.
+            # datetime-local usually returns: "YYYY-MM-DDTHH:MM"
             try:
-                return datetime.strptime(s, '%Y-%m-%d').date()
+                if 'T' in s:
+                    return datetime.strptime(s.split(' ', 1)[0], '%Y-%m-%dT%H:%M')
             except ValueError:
                 pass
 
-            # Secondary fallback: allow YYYY/MM/DD
+            # Otherwise accept date-only formats and convert to midnight datetime.
+            if 'T' in s:
+                s = s.split('T', 1)[0].strip()
+
             try:
-                return datetime.strptime(s.replace('/', '-'), '%Y-%m-%d').date()
+                d = datetime.strptime(s, '%Y-%m-%d').date()
+                return datetime(d.year, d.month, d.day)
+            except ValueError:
+                pass
+
+            try:
+                d = datetime.strptime(s.replace('/', '-'), '%Y-%m-%d').date()
+                return datetime(d.year, d.month, d.day)
             except Exception:
                 return None
 
@@ -1380,7 +1394,7 @@ def create_app(config_class=Config):
 
         # Ensure audit_date always has a value for DB lookup/saving.
         if parsed_audit_date is None:
-            parsed_audit_date = datetime.utcnow().date()
+            parsed_audit_date = datetime.utcnow()
 
         # Set SQLAlchemy-searchable variables
         audit_date = parsed_audit_date
