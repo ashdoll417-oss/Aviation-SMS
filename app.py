@@ -1449,17 +1449,17 @@ def create_app(config_class=Config):
                 user_id=user_id,
             )
 
+        # IMPORTANT: Only assign fields that are guaranteed to exist in the current DB schema
         assurance.audit_date = parsed_audit_date
         assurance.next_audit_date = parsed_next_date
         assurance.finding_details = finding_details
         assurance.status = status
+        assurance.user_id = user_id
 
         # 2. DATE FIX & DATABASE SAVE FIRST (commit immediately BEFORE executing the email code)
         try:
-            assurance.status = status
             db.session.add(assurance)
             db.session.commit()
-
             audit_id_str = str(assurance.id)
         except Exception as e:
             db.session.rollback()
