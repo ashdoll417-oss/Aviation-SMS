@@ -1439,11 +1439,20 @@ def create_app(config_class=Config):
         # IMPORTANT: Production DB schema for safety_assurance (per scripts/sync_all_tables.py)
         # contains ONLY: id, audit_date, finding_details, status, next_audit_date, user_id.
         # Do NOT assign ghost columns (audit_scope/target_month/department_notified/etc) here.
+
+        # Frontend submits audit_scope/target_month, but production schema lacks those columns.
+        # Persist them inside `finding_details` to avoid 500s / crashes.
+        combined_details = (
+            f"Scope: {request.form.get('audit_scope', 'N/A')} | "
+            f"Target Month: {request.form.get('target_month', 'N/A')} | "
+            f"Details: {request.form.get('finding_details', '')}"
+        )
+
         assurance = SafetyAssurance.query.filter_by(user_id=user_id, audit_date=audit_date).first()
         if assurance is None:
             assurance = SafetyAssurance(
                 audit_date=audit_date,
-                finding_details=finding_details,
+                finding_details=combined_details,
                 status=status,
                 next_audit_date=next_audit_date,
                 user_id=user_id,
@@ -1452,7 +1461,7 @@ def create_app(config_class=Config):
         # IMPORTANT: Only assign fields that are guaranteed to exist in the current DB schema
         assurance.audit_date = parsed_audit_date
         assurance.next_audit_date = parsed_next_date
-        assurance.finding_details = finding_details
+        assurance.finding_details = combined_details
         assurance.status = status
         assurance.user_id = user_id
 
