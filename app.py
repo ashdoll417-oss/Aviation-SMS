@@ -1341,66 +1341,177 @@ def create_app(config_class=Config):
     @login_required
     @require_module('audits')
     def safety_assurance_post():
-        user_id = session.get('user_id')
-        if not user_id:
-            flash('Please log in to access this page.')
-            return redirect(url_for('login'))
+        try:
+            user_id = session.get('user_id')
+            if not user_id:
+                flash('Please log in to access this page.')
+                return redirect(url_for('login'))
 
-        # File helpers
-        file = request.files.get('audit_plan')
-        checklist_file = request.files.get('audit_checklist')
+            # File helpers
+            file = request.files.get('audit_plan')
+            checklist_file = request.files.get('audit_checklist')
 
-        import base64
-        from datetime import datetime
+            import base64
+            from datetime import datetime
 
-        # Template uses audit_date_ui/next_audit_date_ui; keep backward-compatible fallbacks.
-        audit_date_in = request.form.get('audit_date_ui') or request.form.get('audit_date')
-        next_audit_date_in = request.form.get('next_audit_date_ui') or request.form.get('next_audit_date')
+            # Template uses audit_date_ui/next_audit_date_ui; keep backward-compatible fallbacks.
+            audit_date_in = request.form.get('audit_date_ui') or request.form.get('audit_date')
+            next_audit_date_in = request.form.get('next_audit_date_ui') or request.form.get('next_audit_date')
 
-        # 1. Robust date parsing (handles YYYY-MM-DD and ISO-like strings with 'T')
-        def _parse_ui_date(val):
-            """
-            Parse values from <input type="datetime-local"> or similar.
+            def _parse_ui_date(val):
+                """
+                Parse values from <input type="datetime-local"> or similar.
+                Returns a Python datetime (midnight if only a date is provided).
+                """
+                if not val:
+                    return None
+                s = str(val).strip()
+                if not s:
+                    return None
 
-            Returns a Python datetime (midnight if only a date is provided),
-            so it matches the SafetyAssurance DateTime columns.
-            """
-            if not val:
-                return None
-            s = str(val).strip()
-            if not s:
-                return None
+                try:
+                    # datetime-local usually returns: "YYYY-MM-DDTHH:MM"
+                    if 'T' in s:
+                        return datetime.strptime(s.split(' ', 1)[0], '%Y-%m-%dT%H:%M')
+                except Exception:
+                    pass
 
-            # If the input includes time, parse full datetime.
-            # datetime-local usually returns: "YYYY-MM-DDTHH:MM"
-            try:
                 if 'T' in s:
-                    return datetime.strptime(s.split(' ', 1)[0], '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
+                    s = s.split('T', 1)[0].strip()
 
-            # Otherwise accept date-only formats and convert to midnight datetime.
-            if 'T' in s:
-                s = s.split('T', 1)[0].strip()
+                for fmt in ('%Y-%m-%d',):
+                    try:
+                        d = datetime.strptime(s, fmt).date()
+                        return datetime(d.year, d.month, d.day)
+                    except Exception:
+                        pass
 
-            try:
-                d = datetime.strptime(s, '%Y-%m-%d').date()
-                return datetime(d.year, d.month, d.day)
-            except ValueError:
-                pass
+                try:
+                    d = datetime.strptime(s.replace('/', '-'), '%Y-%m-%d').date()
+                    return datetime(d.year, d.month, d.day)
+                except Exception:
+                    return None
 
-            try:
-                d = datetime.strptime(s.replace('/', '-'), '%Y-%m-%d').date()
-                return datetime(d.year, d.month, d.day)
-            except Exception:
-                return None
+            parsed_audit_date = _parse_ui_date(audit_date_in) or datetime.utcnow()
+            parsed_next_date = _parse_ui_date(next_audit_date_in)
 
-        parsed_audit_date = _parse_ui_date(audit_date_in)
-        parsed_next_date = _parse_ui_date(next_audit_date_in)
+            status = request.form.get('status') or 'Open'
+            auditee_email = request.form.get('auditee_email')
+            finding_details = request.form.get('finding_details')
+            notification_body = request.form.get('notification_body')
+            audit_scope = request.form.get('audit_scope')
+            target_month = request.form.get('target_month')
 
-        # Ensure audit_date always has a value for DB lookup/saving.
-        if parsed_audit_date is None:
-            parsed_audit_date = datetime.utcnow()
+            combined_details = (
+                f"Scope: {audit_scope or request.form.get('audit_scope', 'N/A')} | "
+                f"Target Month: {target_month or request.form.get('target_month', 'N/A')} | "
+                f"Details: {finding_details or request.form.get('finding_details', '')}"
+            )
+
+            assurance = SafetyAssurance.query.filter_by(user_id=user_id, audit_date=parsed_audit_date).first()
+            if assurance is None:
+                assurance = SafetyAssurance(
+                    audit_date=parsed_audit_date,
+                    finding_details=combined_details,
+                    status=status,
+                    next_audit_date=parsed_next_date,
+                    user_id=user_id,
+                )
+
+            assurance.audit_date = parsed_audit_date
+            assurance.next_audit_date = parsed_next_date
+            assurance.finding_details = combined_details
+            assurance.status = status
+            assurance.user_id = user_id
+
+            # Save FIRST
+            db.session.add(assurance)
+            db.session.commit()
+            audit_id_str = str(assurance.id)
+
+            # Best-effort email dispatch (never block DB save)
+            if auditee_email:
+                try:
+                    from flask_mail import Message
+                    msg = Message(
+                        subject=f"New Safety Audit Notification: {audit_scope or 'Schedules'}",
+                        recipients=[auditee_email],
+                    )
+
+                    record_id = audit_id_str
+                    base_url = request.host_url.rstrip('/')
+
+                    import secrets, datetime as dt
+                    token = secrets.token_urlsafe(32)
+                    token_expires_at = dt.datetime.utcnow() + dt.timedelta(days=30)
+
+                    # Best-effort public token columns
+                    try:
+                        db.session.execute(
+                            text(
+                                "UPDATE safety_assurance SET public_respond_token = :token, "
+                                "public_respond_token_expires_at = :exp WHERE id = :audit_id"
+                            ),
+                            {"token": token, "exp": token_expires_at, "audit_id": record_id},
+                        )
+                        db.session.commit()
+                    except Exception:
+                        db.session.rollback()
+
+                    accept_url = f"{base_url}/safety/assurance/respond/{record_id}/accept?token={token}"
+                    reschedule_url = f"{base_url}/safety/assurance/respond/{record_id}/reschedule?token={token}"
+
+                    msg.html = f"""
+<html><body>
+<p>{notification_body or 'Please review the audit schedule.'}</p>
+<p>Audit ID: {record_id}</p>
+<p><a href="{accept_url}">Accept</a> | <a href="{reschedule_url}">Reschedule</a></p>
+</body></html>
+"""
+                    msg.body = (
+                        f"{notification_body or 'Please review the audit schedule.'}\n\n"
+                        f"Audit ID: {record_id}\n"
+                        f"Accept: {accept_url}\n"
+                        f"Reschedule: {reschedule_url}\n"
+                    )
+
+                    # Best-effort attachments
+                    try:
+                        if file and file.filename:
+                            file.seek(0)
+                            msg.attach(
+                                filename=file.filename,
+                                content_type=getattr(file, 'content_type', None),
+                                data=file.read(),
+                            )
+                    except Exception:
+                        pass
+
+                    try:
+                        if checklist_file and checklist_file.filename:
+                            checklist_file.seek(0)
+                            msg.attach(
+                                filename=checklist_file.filename,
+                                content_type=getattr(checklist_file, 'content_type', None),
+                                data=checklist_file.read(),
+                            )
+                    except Exception:
+                        pass
+
+                    mail = current_app.extensions.get('mail')
+                    if mail is not None:
+                        mail.send(msg)
+                except Exception:
+                    pass
+
+            flash('Safety Assurance record saved successfully.')
+            return redirect(url_for('safety_assurance'))
+
+        except Exception as global_err:
+            import traceback
+            error_details = traceback.format_exc()
+            return f"CRITICAL POST ERROR LOG:<pre>{error_details}</pre>", 500
+
 
         # Set SQLAlchemy-searchable variables
         audit_date = parsed_audit_date
@@ -1578,6 +1689,10 @@ def create_app(config_class=Config):
             current_app.logger.error(f"Mail dispatch error: {mail_err}")
             flash('Safety Assurance record saved successfully.')
             return redirect(url_for('safety_assurance'))
+        except Exception as global_err:
+            import traceback
+            error_details = traceback.format_exc()
+            return f"CRITICAL POST ERROR LOG:<pre>{error_details}</pre>", 500
 
         flash('Safety Assurance record saved successfully.')
         return redirect(url_for('safety_assurance'))
