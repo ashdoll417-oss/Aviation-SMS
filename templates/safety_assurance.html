@@ -138,8 +138,14 @@
                 </td>
                 <td>
                   {% if record['auditee_signature_name'] %}
-                      <strong>{{ record['auditee_signature_name'] }}</strong><br>
-                      <small class="text-muted">Signed: {{ record['auditee_signed_date'] or 'N/A' }}</small>
+                      <span class="text-success"><i class="fa fa-check-circle"></i> {{ record['auditee_signature_name'] }}</span><br>
+                      <small class="text-muted">Signed: {{ record['auditee_signed_date'] }}</small>
+                  {% elif record['status'] == 'Reschedule Requested' %}
+                      <span class="text-warning"><i class="fa fa-clock"></i> Reschedule Requested</span><br>
+                      <small class="text-muted">By: {{ record['auditee_responder_name'] or 'Auditee' }}</small>
+                  {% elif record['status'] == 'Scheduled' and record['auditee_responder_name'] %}
+                      <span class="text-info"><i class="fa fa-calendar-check"></i> Date Accepted</span><br>
+                      <small class="text-muted">By: {{ record['auditee_responder_name'] }}</small>
                   {% else %}
                       <span class="text-muted">Pending Response</span>
                   {% endif %}
