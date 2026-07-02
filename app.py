@@ -772,25 +772,18 @@ def create_app(config_class=Config):
         try:
             db.session.rollback() # Ensure transaction state is fresh
 
-            query = text("""
-                SELECT
-                    id,
-                    audit_date,
-                    target_month,
-                    audit_scope,
-                    status,
-                    finding_details,
-                    auditee_email,
-                    next_audit_date AS next_audit,
-                    auditee_signature_name,
-                    auditee_signed_date,
-                    root_causes,
-                    immediate_corrective_action,
-                    system_alteration
-                FROM safety_assurance
-                ORDER BY audit_date DESC
-            """)
-            records_result = db.session.execute(query).mappings().all()
+            query = """
+            SELECT id, audit_date, target_month, audit_scope, status, finding_details, auditee_email, 
+                   next_audit_date AS next_audit, auditee_signature_name, auditee_signed_date, 
+                   root_causes, immediate_corrective_action, system_alteration 
+            FROM safety_assurance 
+            ORDER BY audit_date DESC;
+            """
+
+            records = db.session.execute(text(query)).mappings().all()
+            print("DEBUG DASHBOARD RECORD DATA:", records[0] if records else "No records")
+
+            records_result = records  # back-compat variable name
             latest = records_result[0] if records_result else None
             assurances = records_result  # back-compat variable name
         except Exception as e:
