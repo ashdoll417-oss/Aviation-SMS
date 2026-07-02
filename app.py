@@ -781,7 +781,12 @@ def create_app(config_class=Config):
                     status,
                     finding_details,
                     auditee_email,
-                    next_audit_date AS next_audit
+                    next_audit_date AS next_audit,
+                    auditee_signature_name,
+                    auditee_signed_date,
+                    root_causes,
+                    immediate_corrective_action,
+                    system_alteration
                 FROM safety_assurance
                 ORDER BY audit_date DESC
             """)
@@ -1231,40 +1236,46 @@ def create_app(config_class=Config):
             return "Invalid token.", 403
 
         if request.method == 'POST':
-            conformance = request.form.get('description_of_conformance', '').strip()
-            root_causes = request.form.get('root_causes', '').strip()
-            corr_action = request.form.get('immediate_corrective_action', '').strip()
-            sys_alteration = request.form.get('system_alteration', '').strip()
-            sig_name = request.form.get('auditee_signature_name', '').strip()
-            sig_date_in = request.form.get('auditee_signed_date', '').strip()
+            # Extract from the actual portal HTML form field names and map to DB columns (per reconciliation)
+            status = 'Responded'
+            auditee_signature_name = request.form.get('auditee_signature_name')
+            auditee_responder_name = request.form.get('auditee_signature_name')  # primary responder identity = signature name
+            auditee_remarks = request.form.get('description_of_conformance')  # maps to remarks
+            root_causes = request.form.get('root_causes')
+            immediate_corrective_action = request.form.get('immediate_corrective_action')
+            system_alteration = request.form.get('system_alteration')
 
-            # Allow DATE/VARCHAR column types; store as ISO date if possible, else store provided string.
-            if sig_date_in:
-                sig_date = sig_date_in
-            else:
-                sig_date = datetime.date.today().isoformat()
+            # Field omitted from this form
+            proposed_alternative_date = None
+
+            sig_date_in = request.form.get('auditee_signed_date')
+            sig_date = sig_date_in.strip() if isinstance(sig_date_in, str) and sig_date_in.strip() else datetime.date.today().isoformat()
 
             try:
                 update_sql = text("""
                     UPDATE safety_assurance 
-                    SET description_of_conformance = :conformance,
+                    SET
+                        status = :status,
+                        auditee_signature_name = :auditee_signature_name,
+                        auditee_responder_name = :auditee_responder_name,
+                        auditee_remarks = :auditee_remarks,
                         root_causes = :root_causes,
-                        immediate_corrective_action = :corr_action,
-                        system_alteration = :sys_alteration,
-                        auditee_signature_name = :sig_name,
-                        auditee_signed_date = :sig_date,
-                        auditee_responder_name = :sig_name,
-                        auditee_remarks = :corr_action,
-                        status = 'Closed'
+                        immediate_corrective_action = :immediate_corrective_action,
+                        system_alteration = :system_alteration,
+                        proposed_alternative_date = :proposed_alternative_date,
+                        auditee_signed_date = :auditee_signed_date
                     WHERE id = :audit_id
                 """)
                 db.session.execute(update_sql, {
-                    "conformance": conformance,
+                    "status": status,
+                    "auditee_signature_name": auditee_signature_name,
+                    "auditee_responder_name": auditee_responder_name,
+                    "auditee_remarks": auditee_remarks,
                     "root_causes": root_causes,
-                    "corr_action": corr_action,
-                    "sys_alteration": sys_alteration,
-                    "sig_name": sig_name,
-                    "sig_date": sig_date,
+                    "immediate_corrective_action": immediate_corrective_action,
+                    "system_alteration": system_alteration,
+                    "proposed_alternative_date": proposed_alternative_date,
+                    "auditee_signed_date": sig_date,
                     "audit_id": audit_id
                 })
                 db.session.commit()
