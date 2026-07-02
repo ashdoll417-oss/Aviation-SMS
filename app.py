@@ -1013,8 +1013,10 @@ def create_app(config_class=Config):
                     {"token": token, "exp": token_expires_at, "audit_id": record['id']}
                 )
                 db.session.commit()
-            except Exception:
+            except Exception as token_update_err:
                 db.session.rollback()
+                print(f"Public token update failed: {token_update_err}")
+                current_app.logger.exception("Public token update failed in safety_assurance_post")
 
             response_link = f"https://aviation-sms.vercel.app/public/safety/respond/{record['id']}?token={token}"
 
@@ -1484,8 +1486,9 @@ def create_app(config_class=Config):
                                 content_type=getattr(file, 'content_type', None),
                                 data=file.read(),
                             )
-                    except Exception:
-                        pass
+                    except Exception as email_attach_err:
+                        print(f"Email attachment (audit_plan) failed: {email_attach_err}")
+                        current_app.logger.exception("Email attachment (audit_plan) failed")
 
                     try:
                         if checklist_file and checklist_file.filename:
@@ -1495,14 +1498,22 @@ def create_app(config_class=Config):
                                 content_type=getattr(checklist_file, 'content_type', None),
                                 data=checklist_file.read(),
                             )
-                    except Exception:
-                        pass
+                    except Exception as email_attach_err:
+                        print(f"Email attachment (audit_checklist) failed: {email_attach_err}")
+                        current_app.logger.exception("Email attachment (audit_checklist) failed")
 
                     mail = current_app.extensions.get('mail')
                     if mail is not None:
-                        mail.send(msg)
-                except Exception:
-                    pass
+                        try:
+                            mail.send(msg)
+                        except Exception as email_send_err:
+                            print(f"Email send failed: {email_send_err}")
+                            current_app.logger.exception("Email send failed")
+                            flash('Email notification failed to send; record was saved.', 'warning')
+                except Exception as email_block_err:
+                    print(f"Email dispatch block failed: {email_block_err}")
+                    current_app.logger.exception("Email dispatch block failed")
+                    flash('Email notification failed to send; record was saved.', 'warning')
 
             flash('Safety Assurance record saved successfully.')
             return redirect(url_for('safety_assurance'))

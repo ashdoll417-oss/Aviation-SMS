@@ -88,6 +88,35 @@ EXPECTED_TABLES = [
             ("status", "TEXT", None),
             ("next_audit_date", "DATE", None),
             ("user_id", "INTEGER", None),
+
+            # Notification / email dispatch targets (used by app.py + templates)
+            ("auditee_email", "VARCHAR(255)", None),
+            ("notification_body", "TEXT", None),
+            ("checklist_name", "VARCHAR(255)", None),
+            ("checklist_data", "BYTEA", None),
+            ("audit_scope", "VARCHAR(255)", None),
+            ("target_month", "VARCHAR(255)", None),
+            ("department_notified", "BOOLEAN", None),
+
+            # Public auditee response security (used by token routes)
+            ("public_respond_token", "VARCHAR(255)", None),
+            ("public_respond_token_expires_at", "TIMESTAMP", None),
+
+            # Auditee response / closure fields (used by public response + admin)
+            ("auditee_responder_name", "VARCHAR(255)", None),
+            ("auditee_remarks", "TEXT", None),
+            ("proposed_alternative_date", "DATE", None),
+            ("description_of_conformance", "TEXT", None),
+            ("root_causes", "TEXT", None),
+            ("immediate_corrective_action", "TEXT", None),
+            ("system_alteration", "TEXT", None),
+            ("auditee_signature_name", "VARCHAR(255)", None),
+            ("auditee_signed_date", "DATE", None),
+
+            # Audit plan/checklist persistence attachments (used by downloads + email)
+            ("audit_plan_filename", "VARCHAR(255)", None),
+            ("audit_plan_data", "BYTEA", None),
+
         ],
         "fks": [
             ("user_id", "public", "user", "id"),
@@ -212,6 +241,9 @@ def _get_database_url() -> str:
         raise RuntimeError(
             "Database URL missing. Provide DATABASE_URL (preferred) or SQLALCHEMY_DATABASE_URI in the environment."
         )
+
+    # Trim any accidental whitespace (this fixes cases like /postgres<space>)
+    db_url = db_url.strip()
 
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
