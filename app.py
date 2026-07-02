@@ -1426,6 +1426,11 @@ def create_app(config_class=Config):
 
             assurance.audit_date = parsed_audit_date
             assurance.next_audit_date = parsed_next_date
+
+            # Persist audit metadata (fixes N/A showing in history + notifications)
+            assurance.audit_scope = audit_scope
+            assurance.target_month = target_month
+
             assurance.finding_details = combined_details
             assurance.status = status
             assurance.user_id = user_id
@@ -1587,6 +1592,8 @@ def create_app(config_class=Config):
         # IMPORTANT: Only assign fields that are guaranteed to exist in the current DB schema
         assurance.audit_date = parsed_audit_date
         assurance.next_audit_date = parsed_next_date
+        assurance.audit_scope = audit_scope
+        assurance.target_month = target_month
         assurance.finding_details = combined_details
         assurance.status = status
         assurance.user_id = user_id
